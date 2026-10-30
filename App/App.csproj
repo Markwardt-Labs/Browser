@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Markwardt.Browser</AssemblyName>
+    <RootNamespace>Markwardt.Browser</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>embedded</DebugType>
+    <NoWarn>$(NoWarn);AVLN3001</NoWarn>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\app.png" />
+    <EmbeddedResource Include="src\Sites\VideoMode.js" LogicalName="Markwardt.Browser.Sites.VideoMode.js" />
+    <EmbeddedResource Include="src\Sites\YouTube.js" LogicalName="Markwardt.Browser.Sites.YouTube.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="CefGlue.Next.Avalonia" Version="156.8078.48" />
+  </ItemGroup>
+
+  <!-- cef.runtime.linux-x64 only copies its files on build and only for OutputType=Exe, so a WinExe app gets
+       nothing and publish never gets them. This mirrors what cef.runtime.win-x64 does for both. The files stay
+       loose next to the executable because libcef cannot be loaded from the single-file bundle, and the package's
+       Resources folder is flattened into the root because CEF only finds icudtl.dat next to libcef. -->
+  <Target Name="CefRedistLinuxX64CopyBuild" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+    <Copy SourceFiles="@(CefRedistLinuxX64)" DestinationFiles="@(CefRedistLinuxX64->'$(TargetDir)$([System.String]::new('%(RecursiveDir)').Replace('Resources/', ''))%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CefRedistLinuxX64CopyPublish" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+    <Copy SourceFiles="@(CefRedistLinuxX64)" DestinationFiles="@(CefRedistLinuxX64->'$(PublishDir)$([System.String]::new('%(RecursiveDir)').Replace('Resources/', ''))%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

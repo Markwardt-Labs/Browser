@@ -1,0 +1,168 @@
+# Architecture
+
+This document explains the high-level design decisions behind Browser's implementation - *why* it's
+built the way it is, not the class-by-class mechanics of *how*.
+
+## CefGlue for the CEF binding
+
+CefGlue.Next.Avalonia provides an Avalonia control that renders a CEF browser and is the most
+current binding with Avalonia support (Chromium 156); CefNet.Avalonia is stuck at Chromium 105 and
+the older CefGlue.Avalonia at Chromium 120. The trade-off it accepts is that the binding is built
+against Avalonia 11.3, so the app stays on that line (see below) instead of Avalonia 12.
+
+## Avalonia stays on 11.3
+
+Avalonia 12 moved types the binding references (`GotFocusEventArgs`), so the control fails with a
+`TypeLoadException` the first time it is created. Pinning Avalonia 11.3 costs the Avalonia 12
+features and is revisited when the binding is rebuilt against 12.
+
+## Off-screen rendering
+
+CEF can either embed a native window for the page or render frames off-screen for Avalonia to draw.
+The native window is the binding's default, and it is the wrong fit here: on X11 it sits in the
+window as a child that receives keystrokes before Avalonia whenever the pointer is over the page, so
+shortcuts and typing into the address box intermittently go to the page, and it brings Chromium's own
+UI along (a native context menu that never closes, accelerators like Ctrl+T opening native Chrome
+windows). Off-screen mode makes Avalonia the only owner of input and of everything drawn on screen,
+at the cost of copying each finished frame from memory into the Avalonia control.
+
+CefGlue's off-screen loader also turns the GPU off for Chromium (`--disable-gpu`,
+`--disable-gpu-compositing`), which would mean no hardware compositing, video decoding, WebGL or
+WebGPU. `CefStarter` therefore initializes CEF itself with `BrowserApp`, which keeps the other
+switches the loader adds, apart from the scrolling one, and leaves the GPU on; the control only skips loading CEF when it is already
+loaded, and picks off-screen mode from an internal flag that the starter sets by reflection. The GPU
+process is steered to ANGLE's Vulkan backend, the one that boots on a headless X server and on the
+NVIDIA driver; where Vulkan is missing, Chromium drops back to software rendering by itself. Frames
+still reach Avalonia through CPU memory, so the GPU accelerates the page, not the final blit. Frames are
+requested at 60 per second and Chromium's smooth scrolling is left on, which is what makes wheel
+scrolling animate instead of jumping a notch at a time; the loader's `--disable-smooth-scrolling` is
+not kept.
+The CEF build also ships without the proprietary codecs, so video that only comes as H.264 or AAC does
+not play, while VP8, VP9, AV1 and Opus (what most large video sites offer) do.
+
+## Pages are always dark
+
+Dark mode is forced for every page by CEF switches rather than injected per site: `force-dark-mode`
+makes pages report `prefers-color-scheme: dark`, so sites with a dark theme use it, and the
+`WebContentsForceDark` feature darkens pages that have none. The two do not fight, because Chromium
+leaves pages that already adapt to the preference alone. The browser background color is set dark
+too, so there is no white flash before a page paints.
+
+## The context menu is drawn by Avalonia
+
+CEF's menu is described by a model, not drawn by the app. Reading that model into plain entries and
+showing them in an Avalonia menu keeps CEF's own commands (back, forward, text editing) while the menu
+matches the rest of the window and, importantly, always closes: the callback CEF waits on is completed
+with a command on a choice and cancelled when the menu closes any other way. Commands that would open
+a native window (view source, DevTools aside) are routed to tabs instead, and entries CEF cannot serve
+off-screen (print) are removed.
+
+## Shortcuts have one map and two paths
+
+Which keys do what lives in one `ShortcutMap`. Keys reach the app through Avalonia when the UI has
+focus and through CEF's keyboard handler when the page has focus (CEF sees them first and would
+otherwise run its own accelerators), so both paths resolve through the same map rather than each
+keeping a list.
+
+## Sign-ins persist, so there is one profile and one running copy
+
+Pages' cookies and storage live in a profile folder under the user's local application data, so signing
+in to a site survives restarts. Chromium batches its cookie writes and this process leaves without
+giving it a chance to finish them, so the cookie store is flushed on a timer and once more as the window
+closes, with shutdown held until that flush completes (and a short timeout in case it never does).
+
+A profile on disk cannot be used by two processes, and CEF's own answer to a second launch is to open a
+native Chrome window in the first. The app therefore allows one running copy per user: a later launch
+sends its address to the running copy over a named pipe and exits before CEF starts, and the running copy
+opens it as a tab and comes forward.
+
+## The address bar searches by default
+
+One box does two jobs, and the common one, searching, should need no prefix, so only text that opts in
+with a leading colon is treated as an address. This avoids guessing from the text (is `localhost`, or
+`my notes`, or `v1.2` an address?), which is what makes a combined box surprising. A search goes to a
+new tab so the page being read is not lost, and bookmark suggestions bring the quickest route to a
+saved page into the same box. The address of the current page is shown behind the colon so that the
+box stays consistent: whatever it shows, submitting it does what it looks like. Everything that is
+known to be an address (launch arguments, addresses handed over by a second launch) skips the box and
+goes through the plain address path.
+
+## Page tooltips have one owner
+
+A page's tooltips arrive from CEF as text. CefGlue's own handling sets that text on the control as an
+Avalonia tooltip and leaves it there, so Avalonia's tooltip service later shows the stale text on its
+own whenever the pointer enters the control, in whatever place it happens to be. The app therefore
+takes tooltips over: `BrowserTooltips` hands every text to `PageBrowser`, which shows it only while the
+pointer is over a visible page, puts the text on the control only while the tooltip is open, and closes
+it (clearing the text) on an empty text from CEF, the pointer leaving or moving away from where it
+appeared, a press, the wheel, a key, and the tab being hidden. Only non-empty texts are held back around
+a context menu, since the page gets no mouse events while one is open and would otherwise show a
+tooltip afterwards over nothing; the empty ones that clear a tooltip must still arrive.
+
+## The pointer press must not look like leaving the page
+
+Pressing a mouse button makes CefGlue's control capture the pointer, and Avalonia reports that as the
+pointer exiting the control. CefGlue forwards it to Chromium as the mouse leaving the page, so a page
+that reacts to a mouse leave loses the element under the click between press and release: YouTube's
+hover preview closes, the release lands on the thumbnail beneath, and the click goes to a common
+ancestor instead of the link. `PageBrowser` swallows an exit that happens while it holds the capture.
+
+## Find is the one thing drawn over the page
+
+Everything else lives in the overview, but finding has to be used while reading the page, so Ctrl+F
+shows a small box floating over the page's corner. It exists only while a search is going on, and
+leaves when the overview opens or the tab changes, so the window is still only the page the rest of
+the time. CEF does the searching and highlighting inside the page; the box just drives it and shows the
+counts CEF reports.
+
+## Several windows share one process
+
+A new window gets its own tab collection, so tabs are separate, and shares the bookmark list and the
+profile with the rest. `App` creates windows, remembers the last one activated so that launches handed
+over by a second copy go there, and releases a window's pages when it closes while others remain. The
+app ends when the last window closes; the cookie flush hold applies to that.
+
+## Bookmarks live in the overview and in a plain file
+
+Bookmarks are a flat list in the overview's sidebar, beside the tab cards, because the overview is
+where the user already goes to decide what to look at; no other UI is added for them. They are saved
+as JSON in the profile folder after every change, written to a temporary file and moved into place so
+a crash cannot leave half a file, and a file that cannot be parsed is treated as empty rather than
+blocking start. Saving is best effort and off the UI thread: a full or read-only disk leaves the
+bookmarks working in memory instead of failing the click. Loading merges with anything added before it
+finished, so an early click is never lost or duplicated. Pages are matched by address ignoring case,
+which is what makes the star a toggle rather than a way to bookmark one page twice.
+
+## One executable, two roles
+
+CEF runs its renderer and GPU work in helper processes. Rather than shipping a second helper
+executable, the app launches itself with CEF's `--type=...` arguments and `CefSubProcess.Run`, the
+first call in `Main`, takes over before any Avalonia code runs. This keeps the release to a single
+managed executable and avoids a helper that has to be found and versioned alongside it.
+
+## CEF runtime beside the executable, not inside it
+
+The managed app and Avalonia's native libraries are bundled into a single self-contained file, but
+`libcef` and Chromium's resource files must be real files in the executable's folder. Releases are
+therefore a zip per platform. The Windows runtime package copies its files on build and publish; the
+Linux package only does so on build for `Exe` projects, so `App.csproj` carries equivalent targets
+(and flattens the package's `Resources/` folder, since CEF only finds `icudtl.dat` next to `libcef`).
+
+## The page is the whole window
+
+A browser's own chrome competes with the page for space and attention, so none is drawn: the window
+is the page. Everything else lives in one overview that appears on demand, in the manner of a desktop
+"activities" overview, with the address box and window controls in a top bar and the tabs as cards.
+This keeps the always-visible UI at zero and puts every tab operation in one place. The overview is
+an Avalonia overlay on top of the page, which only works because pages render off-screen.
+
+The window is frameless and draws its own controls, which exist only in the overview, with invisible
+edge strips for resizing, because a native frame would be permanent chrome. The palette is that of the
+Auto Remote client (the same dark editor colors), so the apps read as one family.
+
+## Tab thumbnails are captured, not live
+
+Tabs that are not showing are hidden and do not render, so their cards cannot mirror them live. Each
+tab instead keeps a bitmap of how it last looked, captured when it stops being the active tab and when
+the overview opens (for the active one). The thumbnail is therefore as fresh as the last time the user
+looked at that tab, which is what a card is for.

@@ -1,0 +1,162 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:tabs="using:Markwardt.Browser.Tabs"
+        xmlns:bookmarks="using:Markwardt.Browser.Bookmarks"
+        x:Class="Markwardt.Browser.MainWindow"
+        x:DataType="tabs:IBrowserTabs"
+        Title="{Binding Active.Title, FallbackValue=Browser}"
+        Icon="/Assets/app.png"
+        Width="1280"
+        Height="800"
+        MinWidth="640"
+        MinHeight="400"
+        SystemDecorations="None"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource Background}">
+  <Grid>
+    <Panel x:Name="ViewHost" />
+
+    <Border x:Name="FindBar" Classes="findbar" IsVisible="False">
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <TextBox x:Name="FindBox" Classes="address" Width="230" Padding="10,0" Watermark="Find in page" KeyDown="OnFindKeyDown" />
+        <TextBlock x:Name="FindCount" Classes="muted" Width="64" FontSize="12" TextAlignment="Center" VerticalAlignment="Center" />
+        <Button Classes="icon matchCase" x:Name="MatchCaseButton" ToolTip.Tip="Match case" Click="OnMatchCaseClick">
+          <TextBlock Text="Aa" />
+        </Button>
+        <Button Classes="icon" ToolTip.Tip="Previous (Shift+Enter)" Click="OnFindPreviousClick">
+          <Path Classes="lineIcon" Data="{StaticResource UpIconGeometry}" Width="14" Height="14" />
+        </Button>
+        <Button Classes="icon" ToolTip.Tip="Next (Enter)" Click="OnFindNextClick">
+          <Path Classes="lineIcon" Data="{StaticResource DownIconGeometry}" Width="14" Height="14" />
+        </Button>
+        <Button Classes="icon" ToolTip.Tip="Close (Esc)" Click="OnFindCloseClick">
+          <Path Classes="lineIcon" Data="{StaticResource CloseIconGeometry}" Width="11" Height="11" />
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <Border x:Name="Overview" IsVisible="False" Background="{DynamicResource Scrim}">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Classes="topbar" Height="44" PointerPressed="OnTopBarPointerPressed">
+          <Grid>
+            <Button Classes="icon" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" ToolTip.Tip="New window" Click="OnNewWindowClick">
+              <Path Classes="lineIcon" Data="{StaticResource NewWindowIconGeometry}" Width="14" Height="14" />
+            </Button>
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" MaxWidth="740" Margin="160,0" VerticalAlignment="Center">
+              <Button Grid.Column="0" Classes="icon" Margin="0,0,2,0" IsEnabled="{Binding Active.CanGoBack}" ToolTip.Tip="Back (Alt+Left)" Click="OnBackClick">
+                <Path Classes="lineIcon" Data="{StaticResource BackIconGeometry}" Width="14" Height="14" />
+              </Button>
+              <Button Grid.Column="1" Classes="icon" Margin="0,0,2,0" IsEnabled="{Binding Active.CanGoForward}" ToolTip.Tip="Forward (Alt+Right)" Click="OnForwardClick">
+                <Path Classes="lineIcon" Data="{StaticResource ForwardIconGeometry}" Width="14" Height="14" />
+              </Button>
+              <Button Grid.Column="2" Classes="icon" Margin="0,0,8,0" ToolTip.Tip="Reload (Ctrl+R)" Click="OnReloadClick">
+                <Path Classes="lineIcon" Data="{StaticResource ReloadIconGeometry}" Width="14" Height="14" />
+              </Button>
+              <Button Grid.Column="3" Classes="icon" Margin="0,0,8,0" ToolTip.Tip="New tab (F2)" Click="OnNewTabClick">
+                <Path Classes="lineIcon" Data="{StaticResource PlusIconGeometry}" Width="14" Height="14" />
+              </Button>
+              <TextBox Grid.Column="4" x:Name="AddressBox" Classes="address" Watermark="Search, or start with : for an address"
+                       GotFocus="OnAddressGotFocus" KeyDown="OnAddressKeyDown" />
+              <Button Grid.Column="5" x:Name="StarButton" Classes="icon star" Margin="8,0,0,0" ToolTip.Tip="Bookmark this page" Click="OnStarClick">
+                <Path Classes="lineIcon" Data="{StaticResource StarIconGeometry}" Width="15" Height="15" />
+              </Button>
+              <Popup Grid.Column="4" x:Name="Suggestions" PlacementTarget="{Binding #AddressBox}" Placement="Bottom" IsLightDismissEnabled="False">
+                <Border x:Name="SuggestionBox" Background="{DynamicResource Elevated}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="6" Padding="4" Margin="0,4,0,0">
+                  <ListBox x:Name="SuggestionList" Classes="suggestions" Background="Transparent" Focusable="False" PointerPressed="OnSuggestionPointerPressed">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="bookmarks:Bookmark">
+                        <StackPanel Spacing="1" Margin="4,2">
+                          <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="muted" Text="{Binding Address}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </Border>
+              </Popup>
+            </Grid>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+              <Button Classes="window" ToolTip.Tip="Minimize" Click="OnMinimizeClick">
+                <Path Classes="lineIcon" Data="{StaticResource MinimizeIconGeometry}" Width="11" Height="11" />
+              </Button>
+              <Button Classes="window" ToolTip.Tip="Maximize" Click="OnMaximizeClick">
+                <Path Classes="lineIcon" Data="{StaticResource MaximizeIconGeometry}" Width="11" Height="11" />
+              </Button>
+              <Button Classes="window close" ToolTip.Tip="Close" Click="OnCloseClick">
+                <Path Classes="lineIcon" Data="{StaticResource CloseIconGeometry}" Width="11" Height="11" />
+              </Button>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <Border DockPanel.Dock="Left" Width="260" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,0,1,0">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Classes="heading" Text="BOOKMARKS" Margin="16,16,16,8" />
+            <TextBlock DockPanel.Dock="Top" x:Name="NoBookmarks" Classes="muted" Text="Press the star to bookmark a page." TextWrapping="Wrap" Margin="16,4" FontSize="12" />
+            <ScrollViewer>
+              <ItemsControl x:Name="BookmarkItems">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="bookmarks:Bookmark">
+                    <Border Classes="bookmark" PointerPressed="OnBookmarkPointerPressed">
+                      <Grid ColumnDefinitions="*,Auto,Auto">
+                        <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                          <TextBlock Classes="bookmarkTitle" Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                          <TextBox Classes="rename" IsVisible="False" KeyDown="OnRenameKeyDown" LostFocus="OnRenameLostFocus" />
+                          <TextBlock Classes="muted" Text="{Binding Address}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="icon" ToolTip.Tip="Rename bookmark" Click="OnRenameBookmarkClick">
+                          <Path Classes="lineIcon" Data="{StaticResource PencilIconGeometry}" Width="12" Height="12" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="icon" ToolTip.Tip="Remove bookmark" Click="OnRemoveBookmarkClick">
+                          <Path Classes="lineIcon" Data="{StaticResource CloseIconGeometry}" Width="10" Height="10" />
+                        </Button>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <ItemsControl ItemsSource="{Binding Items}" Margin="40,36" HorizontalAlignment="Center">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel HorizontalAlignment="Center" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="tabs:IBrowserTab">
+                <Border Classes="card" Classes.on="{Binding IsActive}" PointerPressed="OnCardPointerPressed">
+                  <Grid RowDefinitions="*,Auto">
+                    <Image Grid.Row="0" Source="{Binding Thumbnail}" Stretch="Uniform" VerticalAlignment="Top" IsHitTestVisible="False" />
+                    <Border Grid.Row="1" Background="{DynamicResource Elevated}" CornerRadius="0,0,8,8" Padding="12,0,4,0" Height="36">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Classes="icon" ToolTip.Tip="Close tab" Click="OnCloseTabClick">
+                          <Path Classes="lineIcon" Data="{StaticResource CloseIconGeometry}" Width="10" Height="10" />
+                        </Button>
+                      </Grid>
+                    </Border>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <Grid x:Name="Edges">
+      <Border Classes="edge" Tag="North" Height="3" VerticalAlignment="Top" Margin="8,0" Cursor="SizeNorthSouth" PointerPressed="OnEdgePointerPressed" />
+      <Border Classes="edge" Tag="South" Height="3" VerticalAlignment="Bottom" Margin="8,0" Cursor="SizeNorthSouth" PointerPressed="OnEdgePointerPressed" />
+      <Border Classes="edge" Tag="West" Width="3" HorizontalAlignment="Left" Margin="0,8" Cursor="SizeWestEast" PointerPressed="OnEdgePointerPressed" />
+      <Border Classes="edge" Tag="East" Width="3" HorizontalAlignment="Right" Margin="0,8" Cursor="SizeWestEast" PointerPressed="OnEdgePointerPressed" />
+      <Border Classes="edge" Tag="NorthWest" Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Top" Cursor="TopLeftCorner" PointerPressed="OnEdgePointerPressed" />
+      <Border Classes="edge" Tag="NorthEast" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Top" Cursor="TopRightCorner" PointerPressed="OnEdgePointerPressed" />
+      <Border Classes="edge" Tag="SouthWest" Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" Cursor="BottomLeftCorner" PointerPressed="OnEdgePointerPressed" />
+      <Border Classes="edge" Tag="SouthEast" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="BottomRightCorner" PointerPressed="OnEdgePointerPressed" />
+    </Grid>
+  </Grid>
+</Window>
