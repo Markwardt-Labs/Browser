@@ -30,6 +30,7 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
     <PackageReference Include="CefGlue.Next.Avalonia" Version="156.8078.48" />
+    <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="10.0.13" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- cef.runtime.linux-x64 only copies its files on build and only for OutputType=Exe, so a WinExe app gets
