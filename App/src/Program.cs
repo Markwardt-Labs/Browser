@@ -15,19 +15,23 @@ internal static class Program
     {
         CefSubProcess.Run(args, true);
 
+        ILaunchParser launchParser = new LaunchParser();
         ISingleInstance instance = new SingleInstance($"Markwardt.Browser.{Environment.UserName}");
 
-        if (!instance.Claim(args.FirstOrDefault(argument => !argument.StartsWith('-')) ?? string.Empty).GetAwaiter().GetResult())
+        if (!instance.Claim(args).GetAwaiter().GetResult())
         {
             return 0;
         }
 
+        LaunchOptions launch = launchParser.Parse(args);
         IProfileFolder profile = new ProfileFolder();
+        IUserSettings settings = new UserSettings(new SettingsFile(Path.Combine(profile.Location, "settings.json")));
+        settings.Load().GetAwaiter().GetResult();
         ICefStarter cef = new CefStarter();
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) => CefRuntime.Shutdown();
 
-        return AppBuilder.Configure(() => new App(instance, profile))
+        return AppBuilder.Configure(() => new App(instance, profile, settings, launchParser, launch))
             .UsePlatformDetect()
             .AfterPlatformServicesSetup(_ => cef.Start(
                 new CefSettings

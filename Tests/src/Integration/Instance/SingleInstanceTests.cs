@@ -13,44 +13,44 @@ public sealed class SingleInstanceTests
     /// <returns>A task that completes when the check is done.</returns>
     [Fact]
     public async Task Claim_FirstLaunch_BecomesRunningCopy()
-        => Assert.True(await new SingleInstance(name).Claim(string.Empty));
+        => Assert.True(await new SingleInstance(name).Claim([]));
 
     /// <summary>
-    /// A later launch hands its address to the running copy and is told to exit.
+    /// A later launch hands its whole command line to the running copy and is told to exit.
     /// </summary>
     /// <returns>A task that completes when the check is done.</returns>
     [Fact]
-    public async Task Claim_SecondLaunch_HandsAddressToRunningCopy()
+    public async Task Claim_SecondLaunch_HandsArgumentsToRunningCopy()
     {
         using CancellationTokenSource stop = new();
         SingleInstance first = new(name);
-        TaskCompletionSource<string> received = new();
-        Assert.True(await first.Claim(string.Empty));
+        TaskCompletionSource<IReadOnlyList<string>> received = new();
+        Assert.True(await first.Claim([]));
         first.Listen(received.SetResult, stop.Token);
 
-        bool second = await new SingleInstance(name).Claim("https://example.com");
+        bool second = await new SingleInstance(name).Claim(["--isolate", "--goto", "https://example.com/a b"]);
 
         Assert.False(second);
-        Assert.Equal("https://example.com", await received.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Equal(["--isolate", "--goto", "https://example.com/a b"], await received.Task.WaitAsync(TimeSpan.FromSeconds(10)));
         await stop.CancelAsync();
     }
 
     /// <summary>
-    /// A launch without an address hands over an empty one.
+    /// A launch without arguments hands over an empty command line.
     /// </summary>
     /// <returns>A task that completes when the check is done.</returns>
     [Fact]
-    public async Task Claim_SecondLaunchWithoutAddress_HandsOverEmpty()
+    public async Task Claim_SecondLaunchWithoutArguments_HandsOverNone()
     {
         using CancellationTokenSource stop = new();
         SingleInstance first = new(name);
-        TaskCompletionSource<string> received = new();
-        await first.Claim(string.Empty);
+        TaskCompletionSource<IReadOnlyList<string>> received = new();
+        await first.Claim([]);
         first.Listen(received.SetResult, stop.Token);
 
-        await new SingleInstance(name).Claim(string.Empty);
+        await new SingleInstance(name).Claim([]);
 
-        Assert.Equal(string.Empty, await received.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Empty(await received.Task.WaitAsync(TimeSpan.FromSeconds(10)));
         await stop.CancelAsync();
     }
 }

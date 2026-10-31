@@ -49,6 +49,9 @@
       <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
+    <Style Selector="Border.topbar Button.pin.on Path.lineIcon">
+      <Setter Property="Stroke" Value="{DynamicResource Accent}" />
+    </Style>
     <Style Selector="Border.topbar Button.window">
       <Setter Property="Width" Value="46" />
       <Setter Property="Height" Value="43" />
@@ -220,6 +223,7 @@
       <Geometry x:Key="ForwardIconGeometry">M2,7 L12,7 M7.5,2.5 L12,7 L7.5,11.5</Geometry>
       <Geometry x:Key="ReloadIconGeometry">M11.5,7 A4.5,4.5 0 1 1 10.3,3.9 M10.9,1.6 L10.3,4.2 L7.7,3.6</Geometry>
       <Geometry x:Key="NewWindowIconGeometry">M1.5,2.5 L12.5,2.5 L12.5,11.5 L1.5,11.5 Z M1.5,5 L12.5,5 M7,6.4 L7,10 M5.2,8.2 L8.8,8.2</Geometry>
+      <Geometry x:Key="TopBarIconGeometry">M2,2.5 L12,2.5 L12,11.5 L2,11.5 Z M2,5.5 L12,5.5</Geometry>
       <Geometry x:Key="UpIconGeometry">M2.5,9 L7,4.5 L11.5,9</Geometry>
       <Geometry x:Key="DownIconGeometry">M2.5,5 L7,9.5 L11.5,5</Geometry>
       <Geometry x:Key="CloseIconGeometry">M2,2 L12,12 M12,2 L2,12</Geometry>

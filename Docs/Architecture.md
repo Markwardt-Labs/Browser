@@ -71,10 +71,10 @@ in to a site survives restarts. Chromium batches its cookie writes and this proc
 giving it a chance to finish them, so the cookie store is flushed on a timer and once more as the window
 closes, with shutdown held until that flush completes (and a short timeout in case it never does).
 
-A profile on disk cannot be used by two processes, and CEF's own answer to a second launch is to open a
-native Chrome window in the first. The app therefore allows one running copy per user: a later launch
-sends its address to the running copy over a named pipe and exits before CEF starts, and the running copy
-opens it as a tab and comes forward.
+A profile on disk cannot be used by two processes, and CEF's own answer to a second process on one is to
+open a native Chrome window in the first. The app therefore allows one running copy per user: a later
+launch sends its whole command line to the running copy over a named pipe and exits before CEF starts, and
+the running copy opens a new window for it and comes forward.
 
 ## The address bar searches by default
 
@@ -84,7 +84,7 @@ with a leading colon is treated as an address. This avoids guessing from the tex
 new tab so the page being read is not lost, and bookmark suggestions bring the quickest route to a
 saved page into the same box. The address of the current page is shown behind the colon so that the
 box stays consistent: whatever it shows, submitting it does what it looks like. Everything that is
-known to be an address (launch arguments, addresses handed over by a second launch) skips the box and
+known to be an address (launch arguments, including handed-over ones) skips the box and
 goes through the plain address path.
 
 ## Page tooltips have one owner
@@ -118,8 +118,10 @@ counts CEF reports.
 ## Several windows share one process
 
 A new window gets its own tab collection, so tabs are separate, and shares the bookmark list and the
-profile with the rest. `App` creates windows, remembers the last one activated so that launches handed
-over by a second copy go there, and releases a window's pages when it closes while others remain. The
+profile with the rest. `App` creates windows, one for each launch and one for each press of the new window
+button, and releases a window's pages when it closes while others remain. Launch options are per window
+rather than per process, which is what lets a later launch ask for an isolated or close-only window without
+changing the ones already open. The
 app ends when the last window closes; the cookie flush hold applies to that.
 
 ## Bookmarks live in the overview and in a plain file
@@ -148,17 +150,25 @@ therefore a zip per platform. The Windows runtime package copies its files on bu
 Linux package only does so on build for `Exe` projects, so `App.csproj` carries equivalent targets
 (and flattens the package's `Resources/` folder, since CEF only finds `icudtl.dat` next to `libcef`).
 
-## The page is the whole window
+## The top bar, the overview and isolation
 
-A browser's own chrome competes with the page for space and attention, so none is drawn: the window
-is the page. Everything else lives in one overview that appears on demand, in the manner of a desktop
-"activities" overview, with the address box and window controls in a top bar and the tabs as cards.
-This keeps the always-visible UI at zero and puts every tab operation in one place. The overview is
-an Avalonia overlay on top of the page, which only works because pages render off-screen.
+A browser's own chrome competes with the page for space, so the top bar can be hidden outside the overview,
+which then appears on demand in the manner of a desktop "activities" overview, with the tabs as cards and the
+bookmarks beside them. The bar is a separate element from the overview so that it can show without it: it
+overlays the page, and the page is inset by its height only while it stays visible, so opening the overview
+over a hidden bar does not resize the page. The choice is a setting shared by every window and saved, with the
+bar on by default. The overview is an Avalonia overlay on top of the page, which only works because pages
+render off-screen.
 
-The window is frameless and draws its own controls, which exist only in the overview, with invisible
-edge strips for resizing, because a native frame would be permanent chrome. The palette is that of the
-Auto Remote client (the same dark editor colors), so the apps read as one family.
+For embedding the browser as a single-purpose window, `--isolate` removes the overview altogether and fixes
+the bar on with only the window controls, ignoring and never saving the setting. Without an overview there is
+no way to switch tabs, so requests for a new tab load in the current one. Minimize and maximize can be
+hidden separately with `--close-only`, and a window's starting state and page come from `--window` and
+`--goto`.
+
+The window is frameless and draws its own controls, with invisible edge strips for resizing, because a native
+frame would be permanent chrome. The palette is that of the Auto Remote client (the same dark editor colors),
+so the apps read as one family.
 
 ## Tab thumbnails are captured, not live
 

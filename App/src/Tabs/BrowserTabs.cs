@@ -47,7 +47,9 @@ internal interface IBrowserTabs : INotifyPropertyChanged
 }
 
 /// <inheritdoc cref="IBrowserTabs" />
-internal sealed class BrowserTabs(IBrowserTab.IFactory factory) : ObservableObject, IBrowserTabs
+/// <param name="factory">Creates the tabs.</param>
+/// <param name="singleTab">Whether requests for a new tab load in the current one instead, for windows with no way to switch between tabs.</param>
+internal sealed class BrowserTabs(IBrowserTab.IFactory factory, bool singleTab = false) : ObservableObject, IBrowserTabs
 {
     private IBrowserTab? active;
 
@@ -134,7 +136,16 @@ internal sealed class BrowserTabs(IBrowserTab.IFactory factory) : ObservableObje
     }
 
     private void OnNewTabRequested(string address, bool background)
-        => Open(address, !background);
+    {
+        if (singleTab)
+        {
+            active?.Navigate(address);
+        }
+        else
+        {
+            Open(address, !background);
+        }
+    }
 
     private void OnShortcutPressed(ShortcutCommand command)
         => ShortcutPressed?.Invoke(command);

@@ -3,22 +3,43 @@
 Walkthroughs of Browser in different situations, in place of runnable code samples - there's no
 programmatic API to call, just the application itself.
 
-## See only the page
+## The top bar and the overview
 
-The window shows nothing but the page. Press F1 to bring up the overview: a top bar with the address
-box and the minimize, maximize and close buttons, over a grid of cards, one per open tab. Press F1 or
-Esc again, or choose a card, to go back to the page; clicking empty space does nothing. The window itself opens in the overview. Drag the top bar to
-move the window, double-click it to maximize, and drag the window's edges to resize it.
+The window is a top bar over the page. The bar holds the address box with back, forward, reload and new
+tab buttons, the bookmark star, a new window button at its left edge, and the minimize, maximize and
+close buttons. Its toggle button (left of minimize) chooses whether the bar always shows or only shows in
+the overview; the choice is remembered between runs and starts on.
+
+F1 brings up the overview: a sidebar of bookmarks and a grid of cards, one per open tab, under the top bar.
+Press F1 or Esc again, or choose a card, to go back to the page; clicking empty space does nothing. The
+window opens in the overview. Drag the top bar to move the window, double-click it to maximize, and drag
+the window's edges to resize it.
+
+## Command line
+
+Each option applies to the window the launch opens.
+
+| Option | Does |
+| --- | --- |
+| `<address>` | Opens the address as the first page, with the overview raised over it |
+| `--goto <url>` | Goes straight to the page instead of showing the overview |
+| `--isolate` | Switches the overview off and keeps the top bar always on with only the window controls in it; the bar's toggle is ignored and not saved, F1, Ctrl+L and new tabs do nothing, and links that ask for a new tab load in the current one |
+| `--window maximized\|unmaximized\|minimized` | Sets the state the window starts in |
+| `--close-only` | Hides the minimize and maximize buttons and stops double-clicking the bar from maximizing |
+
+There is one running copy per user. Launching the program again, with or without options, opens a new window
+in the running copy and comes forward; the options on that command line apply to that window only, so
+`--isolate` or `--close-only` on a later launch does not change the windows that are already open.
 
 ## Open a page or search
 
-Open the overview and type into the box, then press Enter. Text that starts with a colon is an address:
+Type into the address box (it shows in the overview, and outside it when the top bar is kept visible), then press Enter. Text that starts with a colon is an address:
 `:youtube.com` loads `https://youtube.com` in the current tab, and `:http://localhost:5000` is used as
 typed. Anything else is a search: `avalonia ui docs` opens a Google search in a new tab. While you type
 a search, bookmarks whose name matches appear under the box; press Down to move onto one and Enter to
-open it in the current tab instead. Esc closes the suggestions, and a second Esc closes the overview.
-The box is empty on a blank tab and shows the current page's address behind a colon otherwise. A first
-command-line argument is opened as the starting page, with no colon needed.
+open it in the current tab instead. Esc closes the suggestions, and a second Esc closes the overview, or, outside the overview, puts the page's address back and returns to the page.
+The box is empty on a blank tab and shows the current page's address behind a colon otherwise. Ctrl+L focuses the box, or opens the
+overview when the top bar is hidden. An address on the command line needs no colon.
 
 ## Work with tabs
 
@@ -37,7 +58,7 @@ bookmarks and sign-ins, and closing one leaves the others running.
 | --- | --- |
 | F1 | Show or hide the overview |
 | F2 or Ctrl+T / Ctrl+W | New tab / close tab |
-| Ctrl+L | Show the overview with the address box focused |
+| Ctrl+L | Focus the address box (opening the overview if the top bar is hidden) |
 | Ctrl+R or F5 | Reload |
 | Ctrl+F | Find in page |
 | Alt+Left / Alt+Right | Back / forward |

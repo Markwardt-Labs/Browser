@@ -14,81 +14,31 @@
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource Background}">
   <Grid>
-    <Panel x:Name="ViewHost" />
+    <Grid x:Name="Page">
+      <Panel x:Name="ViewHost" />
 
-    <Border x:Name="FindBar" Classes="findbar" IsVisible="False">
-      <StackPanel Orientation="Horizontal" Spacing="4">
-        <TextBox x:Name="FindBox" Classes="address" Width="230" Padding="10,0" Watermark="Find in page" KeyDown="OnFindKeyDown" />
-        <TextBlock x:Name="FindCount" Classes="muted" Width="64" FontSize="12" TextAlignment="Center" VerticalAlignment="Center" />
-        <Button Classes="icon matchCase" x:Name="MatchCaseButton" ToolTip.Tip="Match case" Click="OnMatchCaseClick">
-          <TextBlock Text="Aa" />
-        </Button>
-        <Button Classes="icon" ToolTip.Tip="Previous (Shift+Enter)" Click="OnFindPreviousClick">
-          <Path Classes="lineIcon" Data="{StaticResource UpIconGeometry}" Width="14" Height="14" />
-        </Button>
-        <Button Classes="icon" ToolTip.Tip="Next (Enter)" Click="OnFindNextClick">
-          <Path Classes="lineIcon" Data="{StaticResource DownIconGeometry}" Width="14" Height="14" />
-        </Button>
-        <Button Classes="icon" ToolTip.Tip="Close (Esc)" Click="OnFindCloseClick">
-          <Path Classes="lineIcon" Data="{StaticResource CloseIconGeometry}" Width="11" Height="11" />
-        </Button>
-      </StackPanel>
-    </Border>
+      <Border x:Name="FindBar" Classes="findbar" IsVisible="False">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <TextBox x:Name="FindBox" Classes="address" Width="230" Padding="10,0" Watermark="Find in page" KeyDown="OnFindKeyDown" />
+          <TextBlock x:Name="FindCount" Classes="muted" Width="64" FontSize="12" TextAlignment="Center" VerticalAlignment="Center" />
+          <Button Classes="icon matchCase" x:Name="MatchCaseButton" ToolTip.Tip="Match case" Click="OnMatchCaseClick">
+            <TextBlock Text="Aa" />
+          </Button>
+          <Button Classes="icon" ToolTip.Tip="Previous (Shift+Enter)" Click="OnFindPreviousClick">
+            <Path Classes="lineIcon" Data="{StaticResource UpIconGeometry}" Width="14" Height="14" />
+          </Button>
+          <Button Classes="icon" ToolTip.Tip="Next (Enter)" Click="OnFindNextClick">
+            <Path Classes="lineIcon" Data="{StaticResource DownIconGeometry}" Width="14" Height="14" />
+          </Button>
+          <Button Classes="icon" ToolTip.Tip="Close (Esc)" Click="OnFindCloseClick">
+            <Path Classes="lineIcon" Data="{StaticResource CloseIconGeometry}" Width="11" Height="11" />
+          </Button>
+        </StackPanel>
+      </Border>
+    </Grid>
 
-    <Border x:Name="Overview" IsVisible="False" Background="{DynamicResource Scrim}">
+    <Border x:Name="Overview" IsVisible="False" Margin="0,44,0,0" Background="{DynamicResource Scrim}">
       <DockPanel>
-        <Border DockPanel.Dock="Top" Classes="topbar" Height="44" PointerPressed="OnTopBarPointerPressed">
-          <Grid>
-            <Button Classes="icon" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" ToolTip.Tip="New window" Click="OnNewWindowClick">
-              <Path Classes="lineIcon" Data="{StaticResource NewWindowIconGeometry}" Width="14" Height="14" />
-            </Button>
-            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" MaxWidth="740" Margin="160,0" VerticalAlignment="Center">
-              <Button Grid.Column="0" Classes="icon" Margin="0,0,2,0" IsEnabled="{Binding Active.CanGoBack}" ToolTip.Tip="Back (Alt+Left)" Click="OnBackClick">
-                <Path Classes="lineIcon" Data="{StaticResource BackIconGeometry}" Width="14" Height="14" />
-              </Button>
-              <Button Grid.Column="1" Classes="icon" Margin="0,0,2,0" IsEnabled="{Binding Active.CanGoForward}" ToolTip.Tip="Forward (Alt+Right)" Click="OnForwardClick">
-                <Path Classes="lineIcon" Data="{StaticResource ForwardIconGeometry}" Width="14" Height="14" />
-              </Button>
-              <Button Grid.Column="2" Classes="icon" Margin="0,0,8,0" ToolTip.Tip="Reload (Ctrl+R)" Click="OnReloadClick">
-                <Path Classes="lineIcon" Data="{StaticResource ReloadIconGeometry}" Width="14" Height="14" />
-              </Button>
-              <Button Grid.Column="3" Classes="icon" Margin="0,0,8,0" ToolTip.Tip="New tab (F2)" Click="OnNewTabClick">
-                <Path Classes="lineIcon" Data="{StaticResource PlusIconGeometry}" Width="14" Height="14" />
-              </Button>
-              <TextBox Grid.Column="4" x:Name="AddressBox" Classes="address" Watermark="Search, or start with : for an address"
-                       GotFocus="OnAddressGotFocus" KeyDown="OnAddressKeyDown" />
-              <Button Grid.Column="5" x:Name="StarButton" Classes="icon star" Margin="8,0,0,0" ToolTip.Tip="Bookmark this page" Click="OnStarClick">
-                <Path Classes="lineIcon" Data="{StaticResource StarIconGeometry}" Width="15" Height="15" />
-              </Button>
-              <Popup Grid.Column="4" x:Name="Suggestions" PlacementTarget="{Binding #AddressBox}" Placement="Bottom" IsLightDismissEnabled="False">
-                <Border x:Name="SuggestionBox" Background="{DynamicResource Elevated}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="6" Padding="4" Margin="0,4,0,0">
-                  <ListBox x:Name="SuggestionList" Classes="suggestions" Background="Transparent" Focusable="False" PointerPressed="OnSuggestionPointerPressed">
-                    <ListBox.ItemTemplate>
-                      <DataTemplate x:DataType="bookmarks:Bookmark">
-                        <StackPanel Spacing="1" Margin="4,2">
-                          <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Classes="muted" Text="{Binding Address}" FontSize="11" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                      </DataTemplate>
-                    </ListBox.ItemTemplate>
-                  </ListBox>
-                </Border>
-              </Popup>
-            </Grid>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-              <Button Classes="window" ToolTip.Tip="Minimize" Click="OnMinimizeClick">
-                <Path Classes="lineIcon" Data="{StaticResource MinimizeIconGeometry}" Width="11" Height="11" />
-              </Button>
-              <Button Classes="window" ToolTip.Tip="Maximize" Click="OnMaximizeClick">
-                <Path Classes="lineIcon" Data="{StaticResource MaximizeIconGeometry}" Width="11" Height="11" />
-              </Button>
-              <Button Classes="window close" ToolTip.Tip="Close" Click="OnCloseClick">
-                <Path Classes="lineIcon" Data="{StaticResource CloseIconGeometry}" Width="11" Height="11" />
-              </Button>
-            </StackPanel>
-          </Grid>
-        </Border>
-
         <Border DockPanel.Dock="Left" Width="260" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="0,0,1,0">
           <DockPanel>
             <TextBlock DockPanel.Dock="Top" Classes="heading" Text="BOOKMARKS" Margin="16,16,16,8" />
@@ -146,6 +96,61 @@
           </ItemsControl>
         </ScrollViewer>
       </DockPanel>
+    </Border>
+
+    <Border x:Name="TopBar" Classes="topbar" Height="44" VerticalAlignment="Top" PointerPressed="OnTopBarPointerPressed">
+      <Grid>
+        <Button x:Name="NewWindowButton" Classes="icon" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0" ToolTip.Tip="New window" Click="OnNewWindowClick">
+          <Path Classes="lineIcon" Data="{StaticResource NewWindowIconGeometry}" Width="14" Height="14" />
+        </Button>
+        <Grid x:Name="Navigation" ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" MaxWidth="740" Margin="160,0" VerticalAlignment="Center">
+          <Button Grid.Column="0" Classes="icon" Margin="0,0,2,0" IsEnabled="{Binding Active.CanGoBack}" ToolTip.Tip="Back (Alt+Left)" Click="OnBackClick">
+            <Path Classes="lineIcon" Data="{StaticResource BackIconGeometry}" Width="14" Height="14" />
+          </Button>
+          <Button Grid.Column="1" Classes="icon" Margin="0,0,2,0" IsEnabled="{Binding Active.CanGoForward}" ToolTip.Tip="Forward (Alt+Right)" Click="OnForwardClick">
+            <Path Classes="lineIcon" Data="{StaticResource ForwardIconGeometry}" Width="14" Height="14" />
+          </Button>
+          <Button Grid.Column="2" Classes="icon" Margin="0,0,8,0" ToolTip.Tip="Reload (Ctrl+R)" Click="OnReloadClick">
+            <Path Classes="lineIcon" Data="{StaticResource ReloadIconGeometry}" Width="14" Height="14" />
+          </Button>
+          <Button Grid.Column="3" Classes="icon" Margin="0,0,8,0" ToolTip.Tip="New tab (F2)" Click="OnNewTabClick">
+            <Path Classes="lineIcon" Data="{StaticResource PlusIconGeometry}" Width="14" Height="14" />
+          </Button>
+          <TextBox Grid.Column="4" x:Name="AddressBox" Classes="address" Watermark="Search, or start with : for an address"
+                   GotFocus="OnAddressGotFocus" KeyDown="OnAddressKeyDown" />
+          <Button Grid.Column="5" x:Name="StarButton" Classes="icon star" Margin="8,0,0,0" ToolTip.Tip="Bookmark this page" Click="OnStarClick">
+            <Path Classes="lineIcon" Data="{StaticResource StarIconGeometry}" Width="15" Height="15" />
+          </Button>
+          <Popup Grid.Column="4" x:Name="Suggestions" PlacementTarget="{Binding #AddressBox}" Placement="Bottom" IsLightDismissEnabled="False">
+            <Border x:Name="SuggestionBox" Background="{DynamicResource Elevated}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="6" Padding="4" Margin="0,4,0,0">
+              <ListBox x:Name="SuggestionList" Classes="suggestions" Background="Transparent" Focusable="False" PointerPressed="OnSuggestionPointerPressed">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="bookmarks:Bookmark">
+                    <StackPanel Spacing="1" Margin="4,2">
+                      <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Classes="muted" Text="{Binding Address}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </Border>
+          </Popup>
+        </Grid>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button x:Name="PinButton" Classes="window pin" ToolTip.Tip="Keep the top bar visible" Click="OnPinClick">
+            <Path Classes="lineIcon" Data="{StaticResource TopBarIconGeometry}" Width="14" Height="14" />
+          </Button>
+          <Button x:Name="MinimizeButton" Classes="window" ToolTip.Tip="Minimize" Click="OnMinimizeClick">
+            <Path Classes="lineIcon" Data="{StaticResource MinimizeIconGeometry}" Width="11" Height="11" />
+          </Button>
+          <Button x:Name="MaximizeButton" Classes="window" ToolTip.Tip="Maximize" Click="OnMaximizeClick">
+            <Path Classes="lineIcon" Data="{StaticResource MaximizeIconGeometry}" Width="11" Height="11" />
+          </Button>
+          <Button Classes="window close" ToolTip.Tip="Close" Click="OnCloseClick">
+            <Path Classes="lineIcon" Data="{StaticResource CloseIconGeometry}" Width="11" Height="11" />
+          </Button>
+        </StackPanel>
+      </Grid>
     </Border>
 
     <Grid x:Name="Edges">

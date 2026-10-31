@@ -50,7 +50,7 @@ internal sealed class BookmarkFile(string path) : IBookmarkStorage
     public async Task Save(IReadOnlyList<Bookmark> bookmarks, CancellationToken cancellation = default)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        string temporary = $"{path}.tmp";
+        string temporary = $"{path}.{Guid.NewGuid():N}.tmp";
 
         await using (FileStream stream = File.Create(temporary))
         {

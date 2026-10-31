@@ -207,6 +207,21 @@ public sealed class BrowserTabsTests
     }
 
     /// <summary>
+    /// In a window that cannot switch between tabs, a request for a new tab loads in the current one.
+    /// </summary>
+    [Fact]
+    public void NewTabRequested_SingleTab_NavigatesCurrentTab()
+    {
+        BrowserTabs single = new(factory.Object, true);
+        single.Open("https://one.example");
+
+        created[0].Raise(t => t.NewTabRequested += null, "https://popup.example", false);
+
+        Assert.Single(single.Items);
+        created[0].Verify(t => t.Navigate("https://popup.example"), Times.Once);
+    }
+
+    /// <summary>
     /// A closed tab can no longer open tabs.
     /// </summary>
     [Fact]

@@ -1,7 +1,7 @@
 namespace Markwardt.Browser;
 
 /// <summary>
-/// The browser window. It shows only the active page; F1 raises an overview of the tabs with the address box and window controls on top.
+/// The browser window. It shows the active page under a top bar (address box and window controls) that either stays visible or only appears with the overview of the tabs, which F1 raises.
 /// </summary>
 public sealed partial class MainWindow : Window
 {
@@ -9,14 +9,18 @@ public sealed partial class MainWindow : Window
     private readonly IAddressResolver addressResolver;
     private readonly IShortcutMap shortcutMap;
     private readonly IBookmarkList bookmarks;
+    private readonly IUserSettings settings;
+    private readonly LaunchOptions launch;
     private readonly Action newWindow;
     private bool showingAddress;
     private bool matchCase;
     private IBrowserTab? findTab;
 
-    internal MainWindow(IBrowserTabs tabs, IAddressResolver addressResolver, IShortcutMap shortcutMap, IBookmarkList bookmarks, Action newWindow)
+    internal MainWindow(IBrowserTabs tabs, IAddressResolver addressResolver, IShortcutMap shortcutMap, IBookmarkList bookmarks, IUserSettings settings, LaunchOptions launch, bool startInOverview, Action newWindow)
     {
         this.newWindow = newWindow;
+        this.settings = settings;
+        this.launch = launch;
         this.tabs = tabs;
         this.addressResolver = addressResolver;
         this.shortcutMap = shortcutMap;
@@ -25,6 +29,9 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
 
         AddressBox.PropertyChanged += OnAddressBoxPropertyChanged;
+        AddressBox.LostFocus += OnAddressLostFocus;
+        Overview.PropertyChanged += OnOverviewPropertyChanged;
+        settings.PropertyChanged += OnSettingsChanged;
         FindBox.PropertyChanged += OnFindBoxPropertyChanged;
         tabs.PropertyChanged += OnTabsPropertyChanged;
         BookmarkItems.ItemsSource = bookmarks.Items;
@@ -33,37 +40,36 @@ public sealed partial class MainWindow : Window
         tabs.Items.CollectionChanged += OnTabsChanged;
         tabs.ShortcutPressed += Run;
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
-        Opened += (_, _) => ShowOverview();
+        Opened += (_, _) =>
+        {
+            if (startInOverview && !launch.Isolate)
+            {
+                ShowOverview();
+            }
+            else
+            {
+                tabs.Active?.Focus();
+            }
+        };
+
+        if (launch.Isolate)
+        {
+            Navigation.IsVisible = false;
+            NewWindowButton.IsVisible = false;
+            PinButton.IsVisible = false;
+        }
+
+        MinimizeButton.IsVisible = !launch.CloseOnly;
+        MaximizeButton.IsVisible = !launch.CloseOnly;
+        UpdateTopBar();
+        RefreshAddress();
 
         foreach (IBrowserTab tab in tabs.Items)
         {
             ViewHost.Children.Add(tab.View);
             tab.FindResultChanged += OnFindResult;
+            tab.PropertyChanged += OnTabPropertyChanged;
         }
-    }
-
-    /// <summary>
-    /// Handles a later launch of the browser: opens its address in a new tab, or a blank one with the overview up when it had none, and brings the window forward.
-    /// </summary>
-    /// <param name="address">The address the launch was asked to open; empty for none.</param>
-    internal void Receive(string address)
-    {
-        if (WindowState == WindowState.Minimized)
-        {
-            WindowState = WindowState.Normal;
-        }
-
-        if (string.IsNullOrEmpty(address))
-        {
-            Run(ShortcutCommand.NewTab);
-        }
-        else
-        {
-            tabs.Open(addressResolver.Resolve(address));
-            HideOverview();
-        }
-
-        Activate();
     }
 
     /// <summary>
@@ -76,6 +82,7 @@ public sealed partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         bookmarks.Items.CollectionChanged -= OnBookmarksChanged;
+        settings.PropertyChanged -= OnSettingsChanged;
         base.OnClosed(e);
     }
 
@@ -99,20 +106,69 @@ public sealed partial class MainWindow : Window
         {
             ViewHost.Children.Remove(tab.View);
             tab.FindResultChanged -= OnFindResult;
+            tab.PropertyChanged -= OnTabPropertyChanged;
         }
 
         foreach (IBrowserTab tab in e.NewItems?.Cast<IBrowserTab>() ?? [])
         {
             ViewHost.Children.Add(tab.View);
             tab.FindResultChanged += OnFindResult;
+            tab.PropertyChanged += OnTabPropertyChanged;
         }
     }
 
     private void OnTabsPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IBrowserTabs.Active) && FindBar.IsVisible && !ReferenceEquals(findTab, tabs.Active))
+        if (e.PropertyName != nameof(IBrowserTabs.Active))
+        {
+            return;
+        }
+
+        if (FindBar.IsVisible && !ReferenceEquals(findTab, tabs.Active))
         {
             CloseFind(false);
+        }
+
+        RefreshAddress();
+    }
+
+    private void OnTabPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IBrowserTab.Address) && ReferenceEquals(sender, tabs.Active))
+        {
+            RefreshAddress();
+        }
+    }
+
+    private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
+        => UpdateTopBar();
+
+    private void OnOverviewPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == IsVisibleProperty)
+        {
+            UpdateTopBar();
+        }
+    }
+
+    private bool IsTopBarPinned => launch.Isolate || settings.TopBarVisible;
+
+    private void UpdateTopBar()
+    {
+        bool pinned = IsTopBarPinned;
+        TopBar.IsVisible = pinned || Overview.IsVisible;
+        Page.Margin = new Thickness(0, pinned ? TopBar.Height : 0, 0, 0);
+        PinButton.Classes.Set("on", settings.TopBarVisible);
+        ToolTip.SetTip(PinButton, settings.TopBarVisible ? "Show the top bar only in the overview" : "Keep the top bar visible");
+    }
+
+    private void RefreshAddress()
+    {
+        UpdateBookmarks();
+
+        if (!AddressBox.IsKeyboardFocusWithin)
+        {
+            ShowAddress();
         }
     }
 
@@ -233,13 +289,28 @@ public sealed partial class MainWindow : Window
 
     private void ShowOverview()
     {
+        if (launch.Isolate)
+        {
+            return;
+        }
+
         CloseFind(false);
         ShowAddress();
         UpdateBookmarks();
         tabs.Active?.CaptureThumbnail();
         Overview.IsVisible = true;
+        FocusAddress();
+    }
+
+    private void FocusAddress()
+    {
         tabs.Active?.ReleaseFocus();
-        Activate();
+
+        if (WindowState != WindowState.Minimized)
+        {
+            Activate();
+        }
+
         AddressBox.Focus();
         AddressBox.SelectAll();
     }
@@ -266,6 +337,11 @@ public sealed partial class MainWindow : Window
 
     private void Run(ShortcutCommand command)
     {
+        if (launch.Isolate && command is ShortcutCommand.NewTab or ShortcutCommand.FocusAddress or ShortcutCommand.ToggleOverview)
+        {
+            return;
+        }
+
         switch (command)
         {
             case ShortcutCommand.NewTab:
@@ -276,7 +352,16 @@ public sealed partial class MainWindow : Window
                 CloseActiveTab();
                 break;
             case ShortcutCommand.FocusAddress:
-                ShowOverview();
+                if (IsTopBarPinned && !Overview.IsVisible)
+                {
+                    ShowAddress();
+                    FocusAddress();
+                }
+                else
+                {
+                    ShowOverview();
+                }
+
                 break;
             case ShortcutCommand.ToggleOverview:
                 if (Overview.IsVisible)
@@ -327,6 +412,12 @@ public sealed partial class MainWindow : Window
         else if (Suggestions.IsOpen && e.Key == Key.Escape)
         {
             Suggestions.IsOpen = false;
+            e.Handled = true;
+        }
+        else if (!Overview.IsVisible && AddressBox.IsKeyboardFocusWithin && e.Key == Key.Escape)
+        {
+            ShowAddress();
+            tabs.Active?.Focus();
             e.Handled = true;
         }
         else if (Overview.IsVisible && e.Key == Key.Escape)
@@ -420,7 +511,28 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnAddressGotFocus(object? sender, GotFocusEventArgs e)
-        => AddressBox.SelectAll();
+    {
+        AddressBox.SelectAll();
+
+        if (!Overview.IsVisible)
+        {
+            tabs.Active?.ReleaseFocus();
+        }
+    }
+
+    private void OnAddressLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (!Overview.IsVisible)
+        {
+            ShowAddress();
+        }
+    }
+
+    private void OnPinClick(object? sender, RoutedEventArgs e)
+    {
+        settings.TopBarVisible = !settings.TopBarVisible;
+        e.Handled = true;
+    }
 
     private void OnStarClick(object? sender, RoutedEventArgs e)
     {
@@ -600,7 +712,12 @@ public sealed partial class MainWindow : Window
         => Close();
 
     private void ToggleMaximized()
-        => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    {
+        if (!launch.CloseOnly)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        }
+    }
 
     private void OnTopBarPointerPressed(object? sender, PointerPressedEventArgs e)
     {

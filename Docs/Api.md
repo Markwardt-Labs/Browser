@@ -7,9 +7,10 @@ public types, but for the UI a user actually drives.
 
 ## Shape
 
-One frameless window that shows only the active page, with nothing drawn around it. F1 raises an
-overview over the page: a top bar with the address box (new-tab button on its left, bookmark star on its right) and the window controls; a
-sidebar listing the bookmarks; and a grid of cards, one per open tab, each with a thumbnail and the page
+One frameless window: a top bar (navigation buttons, the address box with the new-tab button on its left
+and the bookmark star on its right, and the window controls) over the active page. The user can hide the
+bar outside the overview, leaving only the page. F1 raises an overview over the page, with the bar above
+it: a sidebar listing the bookmarks and a grid of cards, one per open tab, each with a thumbnail and the page
 title. Avalonia owns the window, the
 overview and all input; Chromium Embedded Framework owns everything inside a page (rendering,
 networking, JavaScript). The two meet in `BrowserTab`, which wraps one CEF browser and mirrors its
@@ -23,11 +24,12 @@ window, with only the active one visible, so background tabs keep running.
 
 1. **Start** - `Program.Main` first checks whether this process is a CEF helper (renderer, GPU,
    ...) and, if so, runs as one and exits. Otherwise it checks whether the browser is already running
-   and, if so, hands it the requested address and exits. Otherwise it builds the Avalonia app,
-   initializing CEF in off-screen mode, on the persistent profile, with dark-mode switches before the
-   first window. `App` opens the first tab, on
-   the address given as the first command-line argument if any, and shows the window with the page
-   focused. The window opens in the overview. Further windows come from the overview's new window button.
+   and, if so, hands it the command line and exits. Otherwise it reads the command line (`LaunchParser`),
+   loads the remembered settings and builds the Avalonia app, initializing CEF in off-screen mode, on the
+   persistent profile, with dark-mode switches before the first window. `App` opens a window for the
+   command line (and later for every command line handed over): its first tab is on the `--goto` address or
+   the address given on its own if any, and the window is in the state `--window` asked for. It opens in
+   the overview unless `--goto` or `--isolate` was given. Further windows come from the overview's new window button.
 2. **Overview** - F1 (or Ctrl+L, or Ctrl+T) captures a thumbnail of the active page, shows the
    overview and moves keyboard focus to the address box. F1, Esc, or
    choosing a card hides it again and hands focus back to the page.
@@ -36,8 +38,7 @@ window, with only the active one visible, so background tabs keep running.
    else is a Google search, opened in a new tab. While a search is being typed, the bookmarks whose title
    contains it are offered under the box: Down and Up choose one, and Enter opens it in the active tab
    instead of searching. The box is empty on a blank page and otherwise shows the page's address behind
-   a colon, so submitting it unchanged reloads the page. Launch arguments and addresses handed over by
-   later launches are plain addresses and need no colon.
+   a colon, so submitting it unchanged reloads the page. Launch arguments are plain addresses and need no colon.
 4. **Bookmarks** - the star in the top bar bookmarks the active page, or removes its bookmark when it
    already has one, and shows filled for a bookmarked page. Choosing a bookmark in the sidebar loads it
    in the active tab, a middle click opens it in a new tab, its pencil renames it in place (Enter or
