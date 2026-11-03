@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\app.png" />
+    <EmbeddedResource Include="src\Ads\BuiltIn.txt" LogicalName="Markwardt.Browser.Ads.BuiltIn.txt" />
+    <EmbeddedResource Include="src\Ads\YouTubeAds.js" LogicalName="Markwardt.Browser.Ads.YouTubeAds.js" />
     <EmbeddedResource Include="src\Sites\VideoMode.js" LogicalName="Markwardt.Browser.Sites.VideoMode.js" />
     <EmbeddedResource Include="src\Sites\YouTube.js" LogicalName="Markwardt.Browser.Sites.YouTube.js" />
   </ItemGroup>

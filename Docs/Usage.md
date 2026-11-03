@@ -47,7 +47,7 @@ F2, Ctrl+T, or the plus button beside the address box in the overview, opens a b
 the address box. In the overview, click a card to switch to that tab, and close one with its cross or a
 middle click. Closing the last tab leaves a blank one.
 Clicking a link always follows it in the current tab, even when the page asks for a new window; tabs are
-only created by you. The one exception is a script popup (`window.open` with a size, as the "Sign in with
+only created by you. Windows a page opens without you having clicked anything are refused as ad popups. The one exception is a script popup (`window.open` with a size, as the "Sign in with
 Google" dialog uses): it opens as a small separate window that stays connected to the page that opened
 it, since the sign-in would otherwise never finish. Middle-clicking a link opens it in a new tab, and Alt+clicking or Ctrl+clicking it
 opens it in a background tab, which loads without taking you away from the page.
@@ -72,6 +72,20 @@ Ctrl+F opens a find box at the top right of the page. Matches are highlighted as
 shows which one is active out of how many. Enter (or the down arrow) goes to the next match, Shift+Enter
 (or the up arrow) to the previous one, Aa makes the search case sensitive, and Esc or the cross closes
 it. The box goes away on its own when you open the overview or switch tabs.
+
+## Ads
+
+Ads are blocked without any setup. Requests to ad networks are cancelled before they load, elements that
+are left behind (empty ad slots) are hidden, windows that a page opens by itself, or that lead to an ad, are
+refused, and YouTube's video ads are removed from the player and skipped when one still gets through. Clicking
+a link or button yourself always works, unless the window it opens goes to a known ad address.
+
+The rules come from EasyList and the uBlock Origin filter lists, which are downloaded when the browser first
+runs with a connection and refreshed every few days (a small built-in list covers the time before that and
+offline use). They are kept in the `filters` folder of the profile, so deleting a file there forces a fresh
+download. The blocker catches what the lists describe: a new ad network, or one a site serves from its own
+domain, can get through until the lists catch up. A site that breaks because of the blocking can only be
+fixed by changing the lists for now, as there is no switch.
 
 ## Video mode and YouTube
 

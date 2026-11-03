@@ -37,11 +37,13 @@ internal static class Program
         IProfileFolder profile = new ProfileFolder();
         IUserSettings settings = new UserSettings(new SettingsFile(Path.Combine(profile.Location, "settings.json")));
         settings.Load().GetAwaiter().GetResult();
+        IAdBlocker adBlocker = new AdBlocker(new FilterParser(), new FilterLists(Path.Combine(profile.Location, "filters"), [new FilterListSource { Name = "easylist", Url = "https://easylist.to/easylist/easylist.txt" }, new FilterListSource { Name = "ublock-filters", Url = "https://ublockorigin.github.io/uAssets/filters/filters.txt" }, new FilterListSource { Name = "ublock-unbreak", Url = "https://ublockorigin.github.io/uAssets/filters/unbreak.txt" }], new HttpFilterDownloader(), typeof(Program).Assembly));
+        adBlocker.Load().GetAwaiter().GetResult();
         ICefStarter cef = new CefStarter();
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) => CefRuntime.Shutdown();
 
-        return AppBuilder.Configure(() => new App(instance, profile, settings, launchParser, launch))
+        return AppBuilder.Configure(() => new App(instance, profile, settings, launchParser, launch, adBlocker))
             .UsePlatformDetect()
             .AfterPlatformServicesSetup(_ => cef.Start(
                 new CefSettings

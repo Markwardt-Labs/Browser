@@ -131,11 +131,12 @@ internal interface IBrowserTab : INotifyPropertyChanged
     /// <inheritdoc />
     /// <param name="shortcuts">The shortcuts the tabs catch while a page has focus.</param>
     /// <param name="siteRules">The per-site adjustments the tabs apply to the pages they load.</param>
-    sealed class Factory(IShortcutMap shortcuts, ISiteRules siteRules) : IFactory
+    /// <param name="adBlocker">Decides what the tabs keep out of the pages they load.</param>
+    sealed class Factory(IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker) : IFactory
     {
         /// <inheritdoc />
         public IBrowserTab Create(string address)
-            => new BrowserTab(address, shortcuts, siteRules);
+            => new BrowserTab(address, shortcuts, siteRules, adBlocker);
     }
 }
 
@@ -143,6 +144,7 @@ internal interface IBrowserTab : INotifyPropertyChanged
 internal sealed class BrowserTab : ObservableObject, IBrowserTab
 {
     private readonly PageBrowser browser = new();
+    private readonly IAdBlocker adBlocker;
     private string title = string.Empty;
     private string address;
     private RenderTargetBitmap? thumbnail;
@@ -156,16 +158,18 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
     /// <param name="address">The URL to load.</param>
     /// <param name="shortcuts">The shortcuts to catch while the page has focus.</param>
     /// <param name="siteRules">The per-site adjustments to apply to every frame that loads.</param>
-    public BrowserTab(string address, IShortcutMap shortcuts, ISiteRules siteRules)
+    /// <param name="adBlocker">Decides what to keep out of the page.</param>
+    public BrowserTab(string address, IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker)
     {
         this.address = address;
+        this.adBlocker = adBlocker;
         browser.IsVisible = false;
         browser.Settings.BackgroundColor = new CefColor(255, 30, 30, 30);
         browser.Settings.WindowlessFrameRate = 60;
         browser.ContextMenuHandler = new BrowserContextMenu(browser, Open);
         browser.LinkOpenRequested += Open;
         browser.FindResult += (count, active) => Dispatcher.UIThread.Post(() => FindResultChanged?.Invoke(count, active));
-        browser.LifeSpanHandler = new BrowserPopups((url, background) => Dispatcher.UIThread.Post(() => Open(url, background ? LinkTarget.BackgroundTab : LinkTarget.Current)));
+        browser.LifeSpanHandler = new BrowserPopups(adBlocker, (url, background) => Dispatcher.UIThread.Post(() => Open(url, background ? LinkTarget.BackgroundTab : LinkTarget.Current)));
         browser.LoadingStateChange += (_, state) => Dispatcher.UIThread.Post(() =>
         {
             CanGoBack = state.CanGoBack;
@@ -173,9 +177,12 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
         });
         browser.KeyboardHandler = new BrowserKeys(shortcuts, command => Dispatcher.UIThread.Post(() => ShortcutPressed?.Invoke(command)));
         browser.Address = address;
+        browser.RequestHandler = new BrowserRequests(adBlocker);
+        browser.LoadStart += (_, started) => HideAds(started.Frame);
         browser.LoadEnd += (_, loaded) =>
         {
             string frameAddress = loaded.Frame.Url ?? string.Empty;
+            HideAds(loaded.Frame);
 
             foreach (string script in siteRules.Scripts(frameAddress))
             {
@@ -304,6 +311,16 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
     {
         browser.Dispose();
         thumbnail?.Dispose();
+    }
+
+    private void HideAds(CefFrame frame)
+    {
+        string address = frame.Url ?? string.Empty;
+
+        if (adBlocker.FrameScript(address, frame.IsMain) is { } script)
+        {
+            frame.ExecuteJavaScript(script, address, 0);
+        }
     }
 
     private void Open(string address, LinkTarget target)

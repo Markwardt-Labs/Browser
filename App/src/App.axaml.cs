@@ -8,7 +8,8 @@ namespace Markwardt.Browser;
 /// <param name="settings">The remembered choices.</param>
 /// <param name="launchParser">Reads handed over command lines.</param>
 /// <param name="launch">What this launch's command line asked for, for the first window.</param>
-internal sealed partial class App(ISingleInstance instance, IProfileFolder profile, IUserSettings settings, ILaunchParser launchParser, LaunchOptions launch) : Application
+/// <param name="adBlocker">Keeps ads out of every page.</param>
+internal sealed partial class App(ISingleInstance instance, IProfileFolder profile, IUserSettings settings, ILaunchParser launchParser, LaunchOptions launch, IAdBlocker adBlocker) : Application
 {
     private readonly IAddressResolver addressResolver = new AddressResolver();
     private readonly IShortcutMap shortcutMap = new ShortcutMap();
@@ -26,6 +27,7 @@ internal sealed partial class App(ISingleInstance instance, IProfileFolder profi
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _ = bookmarks.Load();
+            _ = adBlocker.Refresh();
             desktop.ShutdownMode = ShutdownMode.OnLastWindowClose;
             desktop.MainWindow = CreateWindow(launch);
             instance.Listen(args => Dispatcher.UIThread.Post(() => OpenLaunched(launchParser.Parse(args))));
@@ -37,7 +39,7 @@ internal sealed partial class App(ISingleInstance instance, IProfileFolder profi
 
     private MainWindow CreateWindow(LaunchOptions options)
     {
-        IBrowserTabs tabs = new BrowserTabs(new IBrowserTab.Factory(shortcutMap, siteRules), options.Isolate);
+        IBrowserTabs tabs = new BrowserTabs(new IBrowserTab.Factory(shortcutMap, siteRules, adBlocker), options.Isolate);
         tabs.Open(addressResolver.Resolve(options.Goto ?? options.Address ?? string.Empty));
         MainWindow window = new(tabs, addressResolver, shortcutMap, bookmarks, settings, options, !options.Isolate && options.Goto is null, OpenNewWindow);
 
