@@ -129,7 +129,7 @@ On Linux, `dotnet run Scripts/Install.cs` from the repository root builds the ap
 current user. It then shows up as "Browser" in the application launcher; run the script again to update it.
 A path or `file://` address given when launching opens that file.
 
-The install is a single executable (about 300 MB) with the Chromium runtime inside it; the first launch unpacks
+The install is a single executable (about 330 MB) with the Chromium runtime inside it; the first launch unpacks
 the runtime into your local application data folder, which takes a few seconds. The install also downloads
 (once, about 140 MB) a Chromium runtime with H.264 and AAC support to pack in, so video on sites such as Steam
 plays. If that download fails the install still completes, without those codecs, and running the script again
