@@ -13,6 +13,14 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        ICefRuntimeFolder runtime = new CefRuntimeFolder(AppContext.BaseDirectory, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Markwardt.Browser.Runtime"), new CefRuntimeArchive(typeof(Program).Assembly));
+
+        if (args.Any(argument => argument.StartsWith("--type=", StringComparison.Ordinal)))
+        {
+            runtime.Prepare();
+            runtime.Activate();
+        }
+
         CefSubProcess.Run(args, true);
 
         ILaunchParser launchParser = new LaunchParser();
@@ -23,6 +31,8 @@ internal static class Program
             return 0;
         }
 
+        runtime.Prepare();
+        runtime.Activate();
         LaunchOptions launch = launchParser.Parse(args);
         IProfileFolder profile = new ProfileFolder();
         IUserSettings settings = new UserSettings(new SettingsFile(Path.Combine(profile.Location, "settings.json")));
@@ -36,6 +46,8 @@ internal static class Program
             .AfterPlatformServicesSetup(_ => cef.Start(
                 new CefSettings
                 {
+                    ResourcesDirPath = runtime.Location,
+                    LocalesDirPath = Path.Combine(runtime.Location, "locales"),
                     RootCachePath = profile.Location,
                     CachePath = Path.Combine(profile.Location, "Profile"),
                     PersistSessionCookies = true,

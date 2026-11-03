@@ -37,8 +37,15 @@ still reach Avalonia through CPU memory, so the GPU accelerates the page, not th
 requested at 60 per second and Chromium's smooth scrolling is left on, which is what makes wheel
 scrolling animate instead of jumping a notch at a time; the loader's `--disable-smooth-scrolling` is
 not kept.
-The CEF build also ships without the proprietary codecs, so video that only comes as H.264 or AAC does
-not play, while VP8, VP9, AV1 and Opus (what most large video sites offer) do.
+The CEF build from NuGet is Chromium's default build, without the proprietary codecs, so H.264, AAC and
+HEVC video does not play: sites that offer only those, or pair a playable video codec with AAC audio (Steam's
+trailers are AV1 with AAC), show an unsupported-format message, because a page needs both tracks. Decoding
+cannot be added at run time or in the page, since H.264 and AAC are compiled in or absent, so
+`Scripts/Codecs.cs` swaps in a build of the same Chromium version made with `proprietary_codecs=true
+ffmpeg_branding=Chrome`. No official CEF distribution has one, so it is a community build, fetched on
+demand, pinned by hash and applied to local installs only; any other CEF version needs a matching build, so
+the pin moves with the CEF package. HEVC stays unavailable: Chromium only offers it through hardware
+decoders.
 
 ## Pages are always dark
 
@@ -142,13 +149,26 @@ executable, the app launches itself with CEF's `--type=...` arguments and `CefSu
 first call in `Main`, takes over before any Avalonia code runs. This keeps the release to a single
 managed executable and avoids a helper that has to be found and versioned alongside it.
 
-## CEF runtime beside the executable, not inside it
+## One executable, with the CEF runtime packed inside
 
-The managed app and Avalonia's native libraries are bundled into a single self-contained file, but
-`libcef` and Chromium's resource files must be real files in the executable's folder. Releases are
-therefore a zip per platform. The Windows runtime package copies its files on build and publish; the
-Linux package only does so on build for `Exe` projects, so `App.csproj` carries equivalent targets
-(and flattens the package's `Resources/` folder, since CEF only finds `icudtl.dat` next to `libcef`).
+A published build is a single self-contained file. The managed app and Avalonia's native libraries are bundled
+by .NET, but `libcef` and Chromium's resource files (a few hundred MB) cannot be loaded from inside that bundle,
+so publishing zips them (with the package's `Resources/` folder flattened, since CEF only finds `icudtl.dat` next
+to `libcef`) and embeds the zip as a resource, named by its hash. On start, `CefRuntimeFolder` unpacks it once
+into `Markwardt.Browser.Runtime/<hash>` under the local application data folder, writing to a temporary folder and
+renaming it so that an interrupted or concurrent unpack never leaves a half-filled runtime, and deleting runtimes of
+other versions. A first launch takes a couple of seconds longer; later ones find the folder.
+
+The unpacked folder has to be found by both kinds of process. Chromium starts each renderer, GPU and utility
+process from the same executable, so each one does the same check before CEF runs. libcef is then loaded from the
+folder: an unmanaged-library resolver covers the import, and the process's working directory is set to the folder
+because CefGlue otherwise goes looking for libcef through the directories above the executable, which on a
+user's machine can mean scanning their home folder. CEF's resource and locale paths point at the folder too.
+
+A plain build (development and tests) does not pack anything; it copies the runtime next to the executable, and
+`CefRuntimeFolder` uses it from there. Publishing for a runtime with extra codecs passes its folder in, replacing
+the packed files. CEF still creates an empty `extensions` folder beside the executable when it can, which is
+harmless and optional: the app runs from a read-only folder.
 
 ## The top bar, the overview and isolation
 

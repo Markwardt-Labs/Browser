@@ -1,5 +1,7 @@
+global using System.IO.Compression;
 global using Avalonia.Input;
 global using Markwardt.Browser.Bookmarks;
+global using Markwardt.Browser.Engine;
 global using Markwardt.Browser.Instance;
 global using Markwardt.Browser.Launch;
 global using Markwardt.Browser.Settings;

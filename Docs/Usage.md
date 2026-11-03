@@ -47,7 +47,9 @@ F2, Ctrl+T, or the plus button beside the address box in the overview, opens a b
 the address box. In the overview, click a card to switch to that tab, and close one with its cross or a
 middle click. Closing the last tab leaves a blank one.
 Clicking a link always follows it in the current tab, even when the page asks for a new window; tabs are
-only created by you. Middle-clicking a link opens it in a new tab, and Alt+clicking or Ctrl+clicking it
+only created by you. The one exception is a script popup (`window.open` with a size, as the "Sign in with
+Google" dialog uses): it opens as a small separate window that stays connected to the page that opened
+it, since the sign-in would otherwise never finish. Middle-clicking a link opens it in a new tab, and Alt+clicking or Ctrl+clicking it
 opens it in a background tab, which loads without taking you away from the page.
 
 The overview's top bar has back, forward and reload buttons before the plus button, and a new window
@@ -112,6 +114,12 @@ There is no setting to turn this off.
 On Linux, `dotnet run Scripts/Install.cs` from the repository root builds the app and installs it for the
 current user. It then shows up as "Browser" in the application launcher; run the script again to update it.
 A path or `file://` address given when launching opens that file.
+
+The install is a single executable (about 300 MB) with the Chromium runtime inside it; the first launch unpacks
+the runtime into your local application data folder, which takes a few seconds. The install also downloads
+(once, about 140 MB) a Chromium runtime with H.264 and AAC support to pack in, so video on sites such as Steam
+plays. If that download fails the install still completes, without those codecs, and running the script again
+retries. HEVC video does not play either way.
 
 ## Run it from source
 

@@ -19,8 +19,9 @@ licenses are reproduced in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 ## Installing
 
 Download the archive for your platform from the latest
-[Release](https://github.com/Markwardt-Labs/Browser/releases/latest) and extract it to a folder of
-its own - the executable needs the Chromium files extracted beside it:
+[Release](https://github.com/Markwardt-Labs/Browser/releases/latest) and extract it. The browser is one
+self-contained executable; the first time it runs it unpacks its Chromium runtime (about 600 MB) into your
+local application data folder, which takes a few seconds:
 
 - **Windows** - extract `Markwardt.Browser-win-x64.zip` and run `Markwardt.Browser.exe`.
 - **Linux** - extract `Markwardt.Browser-linux-x64.zip`, mark `Markwardt.Browser` executable

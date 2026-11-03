@@ -1,9 +1,12 @@
 global using System.Collections.ObjectModel;
 global using System.ComponentModel;
+global using System.IO.Compression;
 global using System.IO.Pipes;
 global using System.Reflection;
 global using System.Text.Json;
 global using System.Runtime.CompilerServices;
+global using System.Runtime.InteropServices;
+global using System.Runtime.Loader;
 global using Avalonia;
 global using Avalonia.Controls;
 global using Avalonia.Controls.ApplicationLifetimes;

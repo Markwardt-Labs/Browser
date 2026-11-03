@@ -1,8 +1,8 @@
 #:package Markwardt.ScriptUtilities@0.2.0
 #:property TreatWarningsAsErrors=true
 
-// Builds the browser and installs it for the current user on Linux, so it shows up in the desktop's application
-// launcher as "Browser". File-based app (dotnet run) - run from the repo root, e.g. `dotnet run Scripts/Install.cs`.
+// Builds the browser as one self-contained executable (the CEF runtime is packed inside and unpacked on first run)
+// and installs it for the current user on Linux, so it shows up in the desktop's application launcher as "Browser". File-based app (dotnet run) - run from the repo root, e.g. `dotnet run Scripts/Install.cs`.
 // Safe to run again to update: the previous install is replaced.
 
 using Markwardt.ScriptUtilities;
@@ -18,7 +18,26 @@ if (Directory.Exists(staging))
     Directory.Delete(staging, true);
 }
 
-(await Script.Run("dotnet", "publish", "App/App.csproj", "--configuration", "Release", "--runtime", "linux-x64", "--output", staging, "-p:RestoreLockedMode=true")).Verify();
+// Optional: without the codec runtime the install still works, but H.264 and AAC video (Steam trailers, most of the web's mp4) will not play.
+string runtime = Path.Combine(home, ".cache", "Markwardt.Browser", "codec-runtime");
+
+if (Directory.Exists(runtime))
+{
+    Directory.Delete(runtime, true);
+}
+
+List<string> publish = ["publish", "App/App.csproj", "--configuration", "Release", "--runtime", "linux-x64", "--output", staging, "-p:RestoreLockedMode=true"];
+
+if ((await Script.Run(false, "dotnet", "run", "Scripts/Codecs.cs", "--", runtime)).IsFailure)
+{
+    Script.Error("Installing without H.264/AAC support, see the output above.");
+}
+else
+{
+    publish.Add($"-p:CefRuntimeFolder={runtime}");
+}
+
+(await Script.Run("dotnet", [.. publish])).Verify();
 
 // Replacing the folder, not copying over it: a running copy keeps its already-open files, and nothing stale is left behind.
 if (Directory.Exists(install))

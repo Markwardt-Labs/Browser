@@ -106,8 +106,8 @@ jobs:
           dotnet publish App/App.csproj --configuration Release --runtime win-x64 --output publish/win-x64 -p:RestoreLockedMode=true -p:Version=${{ steps.version.outputs.version }}
           dotnet publish App/App.csproj --configuration Release --runtime linux-x64 --output publish/linux-x64 -p:RestoreLockedMode=true -p:Version=${{ steps.version.outputs.version }}
 
-      # The Chromium runtime (libcef plus its resources) has to sit loose next to the executable, so each platform
-      # ships as a zip of its whole publish folder rather than as a bare file.
+      # The publish folder is a single executable with the Chromium runtime packed inside. It ships in a zip, so the
+      # Linux file keeps its executable bit and the third-party notices travel with it.
       - name: Package
         run: |
           for RID in win-x64 linux-x64; do

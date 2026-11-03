@@ -33,15 +33,59 @@
     <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="10.0.13" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- Publishing packs the CEF runtime into the executable (see CefRuntimeFolder), which unpacks it on first run, because
+       libcef cannot be loaded from inside a single-file bundle. A plain build, which is what dev runs and tests use,
+       keeps the runtime loose next to the executable instead. CefRuntimeFolder replaces the files that are packed,
+       for a runtime with extra codecs (see Scripts/Codecs.cs); CefRuntimeVersion must match the CEF runtime packages
+       that CefGlue.Next.Avalonia brings in. The package's Resources folder is flattened into the root because CEF
+       only finds icudtl.dat next to libcef. -->
+  <PropertyGroup>
+    <CefRuntimeVersion>156.0.14</CefRuntimeVersion>
+    <EmbedCefRuntime Condition="'$(EmbedCefRuntime)' == '' And '$(_IsPublishing)' == 'true'">true</EmbedCefRuntime>
+    <CefRuntimeSourceDir Condition="'$(CefRuntimeFolder)' != ''">$([System.IO.Path]::GetFullPath('$(CefRuntimeFolder)'))</CefRuntimeSourceDir>
+    <CefRuntimeSourceDir Condition="'$(CefRuntimeSourceDir)' == '' And '$(RuntimeIdentifier)' == 'linux-x64'">$(NuGetPackageRoot)cef.runtime.linux-x64/$(CefRuntimeVersion)/CEF/linux-x64</CefRuntimeSourceDir>
+    <CefRuntimeSourceDir Condition="'$(CefRuntimeSourceDir)' == '' And '$(RuntimeIdentifier)' == 'win-x64'">$(NuGetPackageRoot)cef.runtime.win-x64/$(CefRuntimeVersion)/CEF/win-x64</CefRuntimeSourceDir>
+    <CefRuntimeBuildDir>$(MSBuildProjectDirectory)/obj/cef-runtime/$(RuntimeIdentifier)/$([MSBuild]::StableStringHash('$(CefRuntimeSourceDir)'))</CefRuntimeBuildDir>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(EmbedCefRuntime)' == 'true'">
+    <CefRuntimeSource Include="$(CefRuntimeSourceDir)/**/*.*" />
+    <EmbeddedResource Include="$(CefRuntimeBuildDir)/cef-runtime.zip" LogicalName="Markwardt.Browser.CefRuntime.zip" />
+    <EmbeddedResource Include="$(CefRuntimeBuildDir)/cef-runtime.id" LogicalName="Markwardt.Browser.CefRuntime.id" />
+  </ItemGroup>
+
+  <Target Name="PackCefRuntime" BeforeTargets="BeforeResGen" Condition="'$(EmbedCefRuntime)' == 'true'"
+          Inputs="@(CefRuntimeSource)" Outputs="$(CefRuntimeBuildDir)/cef-runtime.zip;$(CefRuntimeBuildDir)/cef-runtime.id">
+    <Error Condition="'@(CefRuntimeSource->Count())' == '0'" Text="No CEF runtime files found in '$(CefRuntimeSourceDir)'. Publish with --runtime win-x64 or linux-x64, and check CefRuntimeVersion." />
+    <RemoveDir Directories="$(CefRuntimeBuildDir)/stage" />
+    <Copy SourceFiles="@(CefRuntimeSource)" DestinationFiles="@(CefRuntimeSource->'$(CefRuntimeBuildDir)/stage/$([System.String]::new('%(RecursiveDir)').Replace('Resources/', ''))%(Filename)%(Extension)')" />
+    <Delete Files="$(CefRuntimeBuildDir)/cef-runtime.zip" />
+    <ZipDirectory SourceDirectory="$(CefRuntimeBuildDir)/stage" DestinationFile="$(CefRuntimeBuildDir)/cef-runtime.zip" />
+    <GetFileHash Files="$(CefRuntimeBuildDir)/cef-runtime.zip" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_CefRuntimeHash" />
+    </GetFileHash>
+    <WriteLinesToFile File="$(CefRuntimeBuildDir)/cef-runtime.id" Lines="@(_CefRuntimeHash->'%(FileHash)')" Overwrite="true" />
+    <RemoveDir Directories="$(CefRuntimeBuildDir)/stage" />
+  </Target>
+
   <!-- cef.runtime.linux-x64 only copies its files on build and only for OutputType=Exe, so a WinExe app gets
-       nothing and publish never gets them. This mirrors what cef.runtime.win-x64 does for both. The files stay
-       loose next to the executable because libcef cannot be loaded from the single-file bundle, and the package's
-       Resources folder is flattened into the root because CEF only finds icudtl.dat next to libcef. -->
-  <Target Name="CefRedistLinuxX64CopyBuild" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+       nothing; this does it for the loose layout. cef.runtime.win-x64 copies on build and publish itself, so its two
+       targets are redefined here to stand down when the runtime is packed instead. -->
+  <Target Name="CefRedistLinuxX64CopyBuild" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == 'linux-x64' And '$(EmbedCefRuntime)' != 'true'">
     <Copy SourceFiles="@(CefRedistLinuxX64)" DestinationFiles="@(CefRedistLinuxX64->'$(TargetDir)$([System.String]::new('%(RecursiveDir)').Replace('Resources/', ''))%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 
-  <Target Name="CefRedistLinuxX64CopyPublish" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
-    <Copy SourceFiles="@(CefRedistLinuxX64)" DestinationFiles="@(CefRedistLinuxX64->'$(PublishDir)$([System.String]::new('%(RecursiveDir)').Replace('Resources/', ''))%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  <Target Name="CefRedistWinX64CopyResources" AfterTargets="Build" Condition="'$(MSBuildRestoreSessionId)' == '' And '$(EmbedCefRuntime)' != 'true' And ('$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Windows')) And '$(Platform)' != 'ARM64'))">
+    <ItemGroup>
+      <_CefRedistWinX64File Include="$(NuGetPackageRoot)cef.runtime.win-x64/$(CefRuntimeVersion)/CEF/win-x64/**/*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_CefRedistWinX64File)" DestinationFiles="@(_CefRedistWinX64File->'$(TargetDir)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CefRedistWinX64CopyPublishResources" AfterTargets="Publish" Condition="'$(MSBuildRestoreSessionId)' == '' And '$(EmbedCefRuntime)' != 'true' And ('$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Windows')) And '$(Platform)' != 'ARM64'))">
+    <ItemGroup>
+      <_CefRedistWinX64PublishFile Include="$(NuGetPackageRoot)cef.runtime.win-x64/$(CefRuntimeVersion)/CEF/win-x64/**/*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_CefRedistWinX64PublishFile)" DestinationFiles="@(_CefRedistWinX64PublishFile->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 </Project>
