@@ -44,3 +44,23 @@ for such textures, so this means a new rendering control rather than a setting.
 When Avalonia cannot create an OpenGL context, it draws the window in software and registers every frame
 buffer with the garbage collector, which forces roughly eleven full collections a second. That was seen on the
 virtual display; whether it happens on a given desktop depends on its OpenGL support.
+
+## The stats log
+
+`--stats` records what is needed to tell these cases apart on a real desktop. Frames are counted by listening
+to CefGlue's paint event through reflection (a failure shows as `painthook=FAILED` in the log), and the time
+the UI thread takes to pick up a frame is measured by posting a marker to it, one at a time. The UI thread's
+own lateness comes from a 20 ms timer. CPU use is read from the process list for the browser and each kind of
+Chromium helper, so GPU, renderer and browser costs stay separate. The header says whether Avalonia is drawing
+in software or on the GPU, which decides how to read everything else. Nothing is collected when the switch is
+off, and only host names of pages are logged.
+
+## The Vulkan backend
+
+The GPU was first enabled by forcing ANGLE's Vulkan backend, because that was the only way the GPU process
+booted on the virtual display used for testing. On the real NVIDIA machine it proved unstable: Chromium's log
+showed `VK_ERROR_DEVICE_LOST` from Skia and failed DMA-BUF imports of video frames, then the GPU process
+restarting three times in seven seconds, during which the page delivered no frames and hover previews did not
+play. Chromium's default backend is used now. What cannot be known from the virtual display is whether the
+default one gets the GPU on the real session, which is why `--stats` records GPU process restarts and the
+backend that was asked for.

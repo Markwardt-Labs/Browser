@@ -10,7 +10,13 @@ internal sealed class BrowserPopups(IAdBlocker blocker, Action<string, bool> req
     /// <inheritdoc />
     protected override bool OnBeforePopup(CefBrowser browser, CefFrame frame, int popupId, string targetUrl, string targetFrameName, CefWindowOpenDisposition targetDisposition, bool userGesture, CefPopupFeatures popupFeatures, CefWindowInfo windowInfo, ref CefClient client, CefBrowserSettings settings, ref CefDictionaryValue extraInfo, ref bool noJavascriptAccess)
     {
-        if (!userGesture || blocker.IsAdPopup(targetUrl ?? string.Empty, frame?.Url ?? string.Empty))
+        if (!userGesture)
+        {
+            blocker.NoteRefusedPopup(targetUrl ?? string.Empty, frame?.Url ?? string.Empty, "no user action");
+            return true;
+        }
+
+        if (blocker.IsAdPopup(targetUrl ?? string.Empty, frame?.Url ?? string.Empty))
         {
             return true;
         }

@@ -6,6 +6,7 @@ namespace Tests.Unit.Ads;
 public sealed class AdBlockerTests
 {
     private readonly Mock<IFilterLists> lists = new();
+    private readonly Mock<IRequestStats> stats = new();
     private readonly AdBlocker blocker;
 
     /// <summary>
@@ -13,8 +14,8 @@ public sealed class AdBlockerTests
     /// </summary>
     public AdBlockerTests()
     {
-        lists.Setup(l => l.Read(It.IsAny<CancellationToken>())).ReturnsAsync(["||ads.example.com^\n||tracker.net^$third-party\n@@||ads.example.com/allowed/\n/banners/*/ad_\n|https://exact.example/ad.js|\n||media.example^$media\n||pop.example^$popup\n||site-only.example^$domain=a.com|~sub.a.com\n||wild.example/a*b^\nexample.com##.promo\n##.generic-ad\n###sidebar-ad\nexample.com#@#.generic-ad\n"]);
-        blocker = new AdBlocker(new FilterParser(), lists.Object);
+        lists.Setup(l => l.Read(It.IsAny<CancellationToken>())).ReturnsAsync(["||ads.example.com^\n||tracker.net^$third-party\n@@||ads.example.com/allowed/\n/banners/*/ad_\n|https://exact.example/ad.js|\n||media.example^$media\n||pop.example^$popup\n||site-only.example^$domain=a.com|~sub.a.com\n||wild.example/a*b^\n||redirected.example^$script,redirect=noopjs\nexample.com##.promo\nshop.*##.entity-ad\n##.generic-ad\n###sidebar-ad\nexample.com#@#.generic-ad\n"]);
+        blocker = new AdBlocker(new FilterParser(), lists.Object, new YouTubeAdScript(), stats.Object);
     }
 
     /// <summary>
@@ -118,6 +119,51 @@ public sealed class AdBlockerTests
         Assert.DoesNotContain("#sidebar-ad", frame);
         Assert.Contains(".generic-ad", other);
         Assert.DoesNotContain(".promo", other);
+    }
+
+    /// <summary>
+    /// A rule that redirects to a stand-in resource still blocks the request.
+    /// </summary>
+    /// <returns>A task that completes when the check is done.</returns>
+    [Fact]
+    public async Task ShouldBlock_RedirectRule_Blocks()
+    {
+        await blocker.Load();
+
+        Assert.True(blocker.ShouldBlock("https://redirected.example/x.js", "https://page.org/", AdResourceType.Script));
+    }
+
+    /// <summary>
+    /// A rule for a site under any top level domain hides its elements on every one of them, and on no other site.
+    /// </summary>
+    /// <returns>A task that completes when the check is done.</returns>
+    [Fact]
+    public async Task FrameScript_EntityRule_AppliesToAnyTopLevelDomain()
+    {
+        await blocker.Load();
+
+        Assert.Contains(".entity-ad", blocker.FrameScript("https://www.shop.com/", false)!);
+        Assert.Contains(".entity-ad", blocker.FrameScript("https://shop.co.uk/", false)!);
+        Assert.DoesNotContain(".entity-ad", blocker.FrameScript("https://notshop.com/", false) ?? string.Empty);
+    }
+
+    /// <summary>
+    /// Blocked requests and requests to other sites are counted when diagnostics are on, and first party requests are not.
+    /// </summary>
+    /// <returns>A task that completes when the check is done.</returns>
+    [Fact]
+    public async Task ShouldBlock_CountsForDiagnostics()
+    {
+        stats.Setup(s => s.IsEnabled).Returns(true);
+        await blocker.Load();
+
+        blocker.ShouldBlock("https://ads.example.com/a.js", "https://page.org/", AdResourceType.Script);
+        blocker.ShouldBlock("https://cdn.other.net/a.js", "https://page.org/", AdResourceType.Script);
+        blocker.ShouldBlock("https://page.org/own.js", "https://page.org/", AdResourceType.Script);
+
+        stats.Verify(s => s.Record(true, "Script", "page.org", "ads.example.com"), Times.Once);
+        stats.Verify(s => s.Record(false, "Script", "page.org", "cdn.other.net"), Times.Once);
+        stats.Verify(s => s.Record(It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<string>(), "page.org"), Times.Never);
     }
 
     /// <summary>

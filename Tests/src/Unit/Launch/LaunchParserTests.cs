@@ -19,6 +19,7 @@ public sealed class LaunchParserTests
         Assert.Null(options.Goto);
         Assert.False(options.Isolate);
         Assert.False(options.CloseOnly);
+        Assert.False(options.Stats);
         Assert.Null(options.Window);
     }
 
@@ -68,6 +69,13 @@ public sealed class LaunchParserTests
         Assert.True(options.Isolate);
         Assert.True(options.CloseOnly);
     }
+
+    /// <summary>
+    /// --stats switches the performance log on.
+    /// </summary>
+    [Fact]
+    public void Parse_Stats_IsSet()
+        => Assert.True(parser.Parse(["--stats", "example.com"]).Stats);
 
     /// <summary>
     /// --window takes the three states, in either spelling of the argument and in any letter case.

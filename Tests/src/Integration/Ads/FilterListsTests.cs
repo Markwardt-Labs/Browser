@@ -40,6 +40,7 @@ public sealed class FilterListsTests : IDisposable
 
         Assert.Single(texts);
         Assert.Contains("doubleclick.net", texts[0]);
+        Assert.Contains("/vast.php?", texts[0]);
     }
 
     /// <summary>

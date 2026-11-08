@@ -34,3 +34,15 @@
 ||google.com/pagead/
 ##.adsbygoogle
 ##ins.adsbygoogle
+! Requests of ad protocols whatever domain they go to. Ad networks change domains faster than lists follow, but the shape of a video ad request stays.
+/vast.php?$xmlhttprequest,media,other
+/vast.xml$xmlhttprequest,media,other
+/vmap.xml$xmlhttprequest,media,other
+/vastv3?$xmlhttprequest,media,other
+/adserver/vast$xmlhttprequest,media,other
+/ads/vast$xmlhttprequest,media,other
+/pagead/ads?$xmlhttprequest,subdocument
+/ima3.js$script
+! Affiliate cam widgets that adult sites embed: live video previews from the cam sites' own domains.
+||mmcdn.com^$third-party
+||highwebmedia.com^$third-party

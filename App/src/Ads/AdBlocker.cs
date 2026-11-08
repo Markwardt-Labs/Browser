@@ -23,6 +23,14 @@ internal interface IAdBlocker
     bool IsAdPopup(string url, string openerUrl);
 
     /// <summary>
+    /// Counts a window that was refused without asking the lists (for instance one a page opened by itself), so that diagnostics can show it.
+    /// </summary>
+    /// <param name="url">The address the window would have loaded.</param>
+    /// <param name="openerUrl">The address of the page that opened it.</param>
+    /// <param name="reason">Why it was refused.</param>
+    void NoteRefusedPopup(string url, string openerUrl, string reason);
+
+    /// <summary>
     /// Builds the script that hides the ads in a frame (and, on YouTube, stops its ads from being loaded).
     /// </summary>
     /// <param name="frameUrl">The address the frame is loading.</param>
@@ -48,9 +56,10 @@ internal interface IAdBlocker
 /// <inheritdoc />
 /// <param name="parser">Reads the lists.</param>
 /// <param name="lists">Where the lists come from.</param>
-internal sealed class AdBlocker(IFilterParser parser, IFilterLists lists) : IAdBlocker
+/// <param name="youTube">The script for YouTube's pages.</param>
+/// <param name="stats">Counts the decisions, for diagnostics.</param>
+internal sealed class AdBlocker(IFilterParser parser, IFilterLists lists, IYouTubeAdScript youTube, IRequestStats stats) : IAdBlocker
 {
-    private readonly string youTubeScript = ReadScript();
     private FilterSet? current;
     private Tuple<FilterSet, string>? genericCache;
 
@@ -65,7 +74,24 @@ internal sealed class AdBlocker(IFilterParser parser, IFilterLists lists) : IAdB
         }
 
         AdRequest request = new(url, pageUrl, type);
-        return request.IsFilterable && set.Blocks.Matches(request) && !set.Exceptions.Matches(request);
+        bool blocked = request.IsFilterable && set.Blocks.Matches(request) && !set.Exceptions.Matches(request);
+
+        if (stats.IsEnabled && request.IsFilterable && (blocked || request.IsThirdParty))
+        {
+            stats.Record(blocked, type.ToString(), request.PageHost, request.Host);
+        }
+
+        return blocked;
+    }
+
+    /// <inheritdoc />
+    public void NoteRefusedPopup(string url, string openerUrl, string reason)
+    {
+        if (stats.IsEnabled)
+        {
+            AdRequest request = new(url, openerUrl, AdResourceType.Popup);
+            stats.Record(true, $"Popup ({reason})", request.PageHost, request.IsFilterable ? request.Host : url);
+        }
     }
 
     /// <inheritdoc />
@@ -84,15 +110,15 @@ internal sealed class AdBlocker(IFilterParser parser, IFilterLists lists) : IAdB
         }
 
         string css = Stylesheet(set, frame.Host, isMain);
-        bool youTube = frame.Host == "youtube.com" || frame.Host.EndsWith(".youtube.com", StringComparison.Ordinal) || frame.Host.EndsWith("youtube-nocookie.com", StringComparison.Ordinal);
+        string? youTubeScript = youTube.For(frameUrl);
 
-        if (css.Length == 0 && !youTube)
+        if (css.Length == 0 && youTubeScript is null)
         {
             return null;
         }
 
         string hide = css.Length == 0 ? string.Empty : $"if (!window.__mwAds) {{ window.__mwAds = true; const css = {JsonSerializer.Serialize(css)}; const add = () => {{ const style = document.createElement('style'); style.textContent = css; (document.head || document.documentElement).appendChild(style); }}; if (document.documentElement) {{ add(); }} else {{ new MutationObserver((_, observer) => {{ if (document.documentElement) {{ observer.disconnect(); add(); }} }}).observe(document, {{ childList: true }}); }} }}";
-        return $"(() => {{ {hide} }})();{(youTube ? youTubeScript : string.Empty)}";
+        return $"(() => {{ {hide} }})();{youTubeScript}";
     }
 
     /// <inheritdoc />
@@ -111,13 +137,6 @@ internal sealed class AdBlocker(IFilterParser parser, IFilterLists lists) : IAdB
         }
     }
 
-    private static string ReadScript()
-    {
-        using Stream stream = typeof(AdBlocker).Assembly.GetManifestResourceStream("Markwardt.Browser.Ads.YouTubeAds.js")!;
-        using StreamReader reader = new(stream);
-        return reader.ReadToEnd();
-    }
-
     private string Stylesheet(FilterSet set, string host, bool isMain)
     {
         List<string> suffixes = [];
@@ -130,7 +149,14 @@ internal sealed class AdBlocker(IFilterParser parser, IFilterLists lists) : IAdB
         HashSet<string> allowed = [.. suffixes.Where(set.HostExceptions.ContainsKey).SelectMany(suffix => set.HostExceptions[suffix])];
         StringBuilder css = new();
 
-        foreach (CosmeticRule rule in suffixes.Where(set.HostRules.ContainsKey).SelectMany(suffix => set.HostRules[suffix]))
+        string[] labels = host.Split('.');
+        IEnumerable<CosmeticRule> entityMatches = Enumerable.Range(0, labels.Length)
+            .SelectMany(start => new[] { 1, 2 }.Where(drop => start < labels.Length - drop).Select(drop => string.Join('.', labels[start..(labels.Length - drop)])))
+            .Distinct()
+            .Where(set.EntityRules.ContainsKey)
+            .SelectMany(name => set.EntityRules[name]);
+
+        foreach (CosmeticRule rule in suffixes.Where(set.HostRules.ContainsKey).SelectMany(suffix => set.HostRules[suffix]).Concat(entityMatches))
         {
             if (!allowed.Contains(rule.Selector) && !rule.ExcludedDomains.Any(domain => host == domain || host.EndsWith($".{domain}", StringComparison.Ordinal)))
             {

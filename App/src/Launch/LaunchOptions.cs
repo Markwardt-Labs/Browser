@@ -29,4 +29,9 @@ internal sealed record LaunchOptions
     /// Gets a value indicating whether the minimize and maximize buttons are hidden.
     /// </summary>
     public bool CloseOnly { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a log of the browser's performance is written. It covers the whole run, so only the launch that starts the browser decides it.
+    /// </summary>
+    public bool Stats { get; init; }
 }

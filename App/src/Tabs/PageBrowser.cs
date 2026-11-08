@@ -6,6 +6,7 @@ namespace Markwardt.Browser.Tabs;
 internal sealed class PageBrowser : AvaloniaCefBrowser
 {
     private readonly BrowserTooltips tooltips;
+    private readonly IFrameStats frameStats;
     private string hoveredLink = string.Empty;
     private bool swallowingClick;
     private Point tooltipOrigin;
@@ -14,8 +15,16 @@ internal sealed class PageBrowser : AvaloniaCefBrowser
     /// <summary>
     /// Creates the control.
     /// </summary>
-    public PageBrowser()
+    /// <param name="frameStats">Counts the frames the page delivers, when diagnostics are on.</param>
+    public PageBrowser(IFrameStats frameStats)
     {
+        this.frameStats = frameStats;
+
+        if (frameStats.IsEnabled)
+        {
+            AttachedToVisualTree += (_, _) => HookPaint();
+        }
+
         tooltips = new(text => Dispatcher.UIThread.Post(() => ShowTooltip(text), DispatcherPriority.Input));
         Focusable = true;
         DisplayHandler = tooltips;
@@ -118,6 +127,31 @@ internal sealed class PageBrowser : AvaloniaCefBrowser
     /// </summary>
     public void ReleaseTooltips()
         => tooltips.Release();
+
+    private void HookPaint()
+    {
+        FieldInfo? field = typeof(BaseCefBrowser).GetFields(BindingFlags.NonPublic | BindingFlags.Instance).FirstOrDefault(candidate => candidate.FieldType.Name == "CommonBrowserAdapter");
+        object? adapter = field?.GetValue(this);
+        EventInfo? paintEvent = adapter?.GetType().GetEvent("Paint");
+
+        if (adapter is null || paintEvent is null || paintEvent.EventHandlerType is null)
+        {
+            frameStats.HookFailed();
+            return;
+        }
+
+        MethodInfo handler = typeof(PageBrowser).GetMethod(nameof(OnPaintDelivered), BindingFlags.NonPublic | BindingFlags.Instance)!.MakeGenericMethod(paintEvent.EventHandlerType.GetGenericArguments()[0]);
+        paintEvent.AddEventHandler(adapter, Delegate.CreateDelegate(paintEvent.EventHandlerType, this, handler));
+    }
+
+    private void OnPaintDelivered<T>(object? sender, T args)
+    {
+        Type type = typeof(T);
+        int width = type.GetProperty("Width")?.GetValue(args) as int? ?? 0;
+        int height = type.GetProperty("Height")?.GetValue(args) as int? ?? 0;
+        CefRectangle[]? rects = type.GetProperty("DirtyRects")?.GetValue(args) as CefRectangle[];
+        frameStats.Painted(width, height, rects?.Sum(rect => (long)rect.Width * rect.Height) ?? 0);
+    }
 
     private void OnPointerPressedOverPage(object? sender, PointerPressedEventArgs e)
     {

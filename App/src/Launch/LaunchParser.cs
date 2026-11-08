@@ -40,6 +40,10 @@ internal sealed class LaunchParser : ILaunchParser
             {
                 options = options with { Isolate = true };
             }
+            else if (parts[0] == "--stats")
+            {
+                options = options with { Stats = true };
+            }
             else if (parts[0] == "--close-only")
             {
                 options = options with { CloseOnly = true };

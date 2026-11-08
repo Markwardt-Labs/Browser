@@ -132,18 +132,19 @@ internal interface IBrowserTab : INotifyPropertyChanged
     /// <param name="shortcuts">The shortcuts the tabs catch while a page has focus.</param>
     /// <param name="siteRules">The per-site adjustments the tabs apply to the pages they load.</param>
     /// <param name="adBlocker">Decides what the tabs keep out of the pages they load.</param>
-    sealed class Factory(IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker) : IFactory
+    /// <param name="frameStats">Counts the frames the pages deliver, when diagnostics are on.</param>
+    sealed class Factory(IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker, IFrameStats frameStats) : IFactory
     {
         /// <inheritdoc />
         public IBrowserTab Create(string address)
-            => new BrowserTab(address, shortcuts, siteRules, adBlocker);
+            => new BrowserTab(address, shortcuts, siteRules, adBlocker, frameStats);
     }
 }
 
 /// <inheritdoc cref="IBrowserTab" />
 internal sealed class BrowserTab : ObservableObject, IBrowserTab
 {
-    private readonly PageBrowser browser = new();
+    private readonly PageBrowser browser;
     private readonly IAdBlocker adBlocker;
     private string title = string.Empty;
     private string address;
@@ -159,8 +160,10 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
     /// <param name="shortcuts">The shortcuts to catch while the page has focus.</param>
     /// <param name="siteRules">The per-site adjustments to apply to every frame that loads.</param>
     /// <param name="adBlocker">Decides what to keep out of the page.</param>
-    public BrowserTab(string address, IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker)
+    /// <param name="frameStats">Counts the frames the page delivers, when diagnostics are on.</param>
+    public BrowserTab(string address, IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker, IFrameStats frameStats)
     {
+        browser = new PageBrowser(frameStats);
         this.address = address;
         this.adBlocker = adBlocker;
         browser.IsVisible = false;

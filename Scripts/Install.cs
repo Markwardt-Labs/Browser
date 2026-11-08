@@ -3,7 +3,7 @@
 
 // Builds the browser as one self-contained executable (the CEF runtime is packed inside and unpacked on first run)
 // and installs it for the current user on Linux, so it shows up in the desktop's application launcher as "Browser". File-based app (dotnet run) - run from the repo root, e.g. `dotnet run Scripts/Install.cs`.
-// Safe to run again to update: the previous install is replaced.
+// Safe to run again to update: the previous install is replaced. Pass `-- --stats` to make the launcher start the browser with its performance log on.
 
 using Markwardt.ScriptUtilities;
 
@@ -64,7 +64,7 @@ await File.WriteAllTextAsync(Path.Combine(applications, "browser.desktop"), $"""
     Type=Application
     Name=Browser
     Comment=A web browser that shows only the page
-    Exec={Path.Combine(install, "Markwardt.Browser")} %U
+    Exec={Path.Combine(install, "Markwardt.Browser")}{(args.Contains("--stats") ? " --stats" : string.Empty)} %U
     Icon=markwardt-browser
     Terminal=false
     Categories=Network;WebBrowser;

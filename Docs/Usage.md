@@ -25,6 +25,7 @@ Each option applies to the window the launch opens.
 | `--goto <url>` | Goes straight to the page instead of showing the overview |
 | `--isolate` | Switches the overview off and keeps the top bar always on with only the window controls in it; the bar's toggle is ignored and not saved, F1, Ctrl+L and new tabs do nothing, and links that ask for a new tab load in the current one |
 | `--window maximized\|unmaximized\|minimized` | Sets the state the window starts in |
+| `--stats` | Writes a performance log (see Performance below); it covers the whole run, so only the launch that starts the browser decides it |
 | `--close-only` | Hides the minimize and maximize buttons and stops double-clicking the bar from maximizing |
 
 There is one running copy per user. Launching the program again, with or without options, opens a new window
@@ -80,9 +81,10 @@ are left behind (empty ad slots) are hidden, windows that a page opens by itself
 refused, and YouTube's video ads are removed from the player and skipped when one still gets through. Clicking
 a link or button yourself always works, unless the window it opens goes to a known ad address.
 
-The rules come from EasyList and the uBlock Origin filter lists, which are downloaded when the browser first
-runs with a connection and refreshed every few days (a small built-in list covers the time before that and
-offline use). They are kept in the `filters` folder of the profile, so deleting a file there forces a fresh
+The rules come from EasyList, the uBlock Origin filter lists, Peter Lowe's ad server list and EasyList's
+adult-site lists, which are downloaded when the browser first runs with a connection and refreshed every few
+days (a small built-in list, which also recognizes video ad requests by their shape, covers the time before that
+and offline use). They are kept in the `filters` folder of the profile, so deleting a file there forces a fresh
 download. The blocker catches what the lists describe: a new ad network, or one a site serves from its own
 domain, can get through until the lists catch up. A site that breaks because of the blocking can only be
 fixed by changing the lists for now, as there is no switch.
@@ -134,6 +136,17 @@ the runtime into your local application data folder, which takes a few seconds. 
 (once, about 140 MB) a Chromium runtime with H.264 and AAC support to pack in, so video on sites such as Steam
 plays. If that download fails the install still completes, without those codecs, and running the script again
 retries. HEVC video does not play either way.
+
+`dotnet run Scripts/Install.cs -- --stats` makes the launcher entry start the browser with `--stats`.
+
+## Performance log
+
+With `--stats` the browser writes `stats/stats-<date>-<time>.log` in the profile folder (the newest ten are kept):
+comment lines describing the machine, screens and how the window is drawn, then a line every two seconds with
+the frames delivered per second and their size, CPU use of the browser, GPU, renderer and other helper
+processes (100% is one core), how late the UI thread ran, garbage collections, memory and the site being viewed.
+The ad blocker's decisions go to `requests-<date>-<time>.log` beside it: what was blocked, which popups were
+refused and which requests to other sites were let through. It records host names only, never full addresses.
 
 ## Run it from source
 

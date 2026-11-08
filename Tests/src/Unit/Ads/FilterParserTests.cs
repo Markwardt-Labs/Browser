@@ -25,7 +25,7 @@ public sealed class FilterParserTests
     /// <param name="line">The rule.</param>
     [Theory]
     [InlineData("/ads[0-9]+/")]
-    [InlineData("||example.com^$redirect=noopjs")]
+    [InlineData("||example.com^$redirect-rule=noopjs")]
     [InlineData("||example.com^$removeparam=utm")]
     [InlineData("||example.com^$csp=script-src 'none'")]
     [InlineData("example.com##+js(aopr, x)")]
@@ -40,6 +40,25 @@ public sealed class FilterParserTests
         Assert.Empty(set.GenericSimple);
         Assert.Empty(set.GenericComplex);
         Assert.Empty(set.HostRules);
+    }
+
+    /// <summary>
+    /// A rule that redirects to a stand-in resource is read as the blocking rule it is.
+    /// </summary>
+    [Fact]
+    public void Parse_RedirectRule_IsBlockingRule()
+        => Assert.Equal(1, parser.Parse(["||example.com^$script,redirect=noopjs"]).Blocks.Count);
+
+    /// <summary>
+    /// A rule for a site under any top level domain is kept by the site's name, together with a plain site in the same rule.
+    /// </summary>
+    [Fact]
+    public void Parse_EntityDomain_IsKeptByName()
+    {
+        FilterSet set = parser.Parse(["a.com,shop.*##.promo"]);
+
+        Assert.Equal(".promo", set.EntityRules["shop"].Single().Selector);
+        Assert.Equal(".promo", set.HostRules["a.com"].Single().Selector);
     }
 
     /// <summary>

@@ -15,13 +15,14 @@ internal static class Program
     {
         ICefRuntimeFolder runtime = new CefRuntimeFolder(AppContext.BaseDirectory, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Markwardt.Browser.Runtime"), new CefRuntimeArchive(typeof(Program).Assembly));
 
+        IYouTubeAdScript youTube = new YouTubeAdScript();
+
         if (args.Any(argument => argument.StartsWith("--type=", StringComparison.Ordinal)))
         {
             runtime.Prepare();
             runtime.Activate();
+            Environment.Exit(new HelperProcess(youTube).Run(args));
         }
-
-        CefSubProcess.Run(args, true);
 
         ILaunchParser launchParser = new LaunchParser();
         ISingleInstance instance = new SingleInstance($"Markwardt.Browser.{Environment.UserName}");
@@ -37,13 +38,14 @@ internal static class Program
         IProfileFolder profile = new ProfileFolder();
         IUserSettings settings = new UserSettings(new SettingsFile(Path.Combine(profile.Location, "settings.json")));
         settings.Load().GetAwaiter().GetResult();
-        IAdBlocker adBlocker = new AdBlocker(new FilterParser(), new FilterLists(Path.Combine(profile.Location, "filters"), [new FilterListSource { Name = "easylist", Url = "https://easylist.to/easylist/easylist.txt" }, new FilterListSource { Name = "ublock-filters", Url = "https://ublockorigin.github.io/uAssets/filters/filters.txt" }, new FilterListSource { Name = "ublock-unbreak", Url = "https://ublockorigin.github.io/uAssets/filters/unbreak.txt" }], new HttpFilterDownloader(), typeof(Program).Assembly));
+        IRequestStats requestStats = new RequestStats(launch.Stats);
+        IAdBlocker adBlocker = new AdBlocker(new FilterParser(), new FilterLists(Path.Combine(profile.Location, "filters"), [new FilterListSource { Name = "easylist", Url = "https://easylist.to/easylist/easylist.txt" }, new FilterListSource { Name = "ublock-filters", Url = "https://ublockorigin.github.io/uAssets/filters/filters.txt" }, new FilterListSource { Name = "ublock-unbreak", Url = "https://ublockorigin.github.io/uAssets/filters/unbreak.txt" }, new FilterListSource { Name = "peter-lowe", Url = "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=0&mimetype=plaintext" }, new FilterListSource { Name = "ublock-badware", Url = "https://ublockorigin.github.io/uAssets/filters/badware.txt" }, new FilterListSource { Name = "adult-adservers", Url = "https://raw.githubusercontent.com/easylist/easylist/master/easylist_adult/adult_adservers.txt" }, new FilterListSource { Name = "adult-adservers-popup", Url = "https://raw.githubusercontent.com/easylist/easylist/master/easylist_adult/adult_adservers_popup.txt" }, new FilterListSource { Name = "adult-thirdparty", Url = "https://raw.githubusercontent.com/easylist/easylist/master/easylist_adult/adult_thirdparty.txt" }, new FilterListSource { Name = "adult-thirdparty-popup", Url = "https://raw.githubusercontent.com/easylist/easylist/master/easylist_adult/adult_thirdparty_popup.txt" }, new FilterListSource { Name = "adult-specific-block", Url = "https://raw.githubusercontent.com/easylist/easylist/master/easylist_adult/adult_specific_block.txt" }, new FilterListSource { Name = "adult-specific-hide", Url = "https://raw.githubusercontent.com/easylist/easylist/master/easylist_adult/adult_specific_hide.txt" }], new HttpFilterDownloader(), typeof(Program).Assembly), youTube, requestStats);
         adBlocker.Load().GetAwaiter().GetResult();
         ICefStarter cef = new CefStarter();
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) => CefRuntime.Shutdown();
 
-        return AppBuilder.Configure(() => new App(instance, profile, settings, launchParser, launch, adBlocker))
+        return AppBuilder.Configure(() => new App(instance, profile, settings, launchParser, launch, adBlocker, requestStats))
             .UsePlatformDetect()
             .AfterPlatformServicesSetup(_ => cef.Start(
                 new CefSettings
@@ -55,11 +57,7 @@ internal static class Program
                     PersistSessionCookies = true,
                     BackgroundColor = new CefColor(255, 30, 30, 30),
                 },
-                [
-                    new KeyValuePair<string, string>("force-dark-mode", string.Empty),
-                    new KeyValuePair<string, string>("use-angle", "vulkan"),
-                    new KeyValuePair<string, string>("enable-features", "Vulkan,WebContentsForceDark"),
-                ]))
+                new ChromiumSwitches().Build(Environment.GetEnvironmentVariable("MARKWARDT_ANGLE"))))
             .StartWithClassicDesktopLifetime(args);
     }
 }

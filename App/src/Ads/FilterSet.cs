@@ -38,6 +38,11 @@ internal sealed record FilterSet
     public IReadOnlyDictionary<string, IReadOnlyList<CosmeticRule>> HostRules { get; init; } = new Dictionary<string, IReadOnlyList<CosmeticRule>>();
 
     /// <summary>
+    /// Gets the selectors that hide elements, by the name a site has before its country or other top level part (for <c>example.*</c>, the name <c>example</c>).
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<CosmeticRule>> EntityRules { get; init; } = new Dictionary<string, IReadOnlyList<CosmeticRule>>();
+
+    /// <summary>
     /// Gets the selectors that are not hidden after all, by the site (and its subdomains) they are allowed on.
     /// </summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>> HostExceptions { get; init; } = new Dictionary<string, IReadOnlySet<string>>();

@@ -31,8 +31,10 @@ CefGlue's off-screen loader also turns the GPU off for Chromium (`--disable-gpu`
 WebGPU. `CefStarter` therefore initializes CEF itself with `BrowserApp`, which keeps the other
 switches the loader adds, apart from the scrolling one, and leaves the GPU on; the control only skips loading CEF when it is already
 loaded, and picks off-screen mode from an internal flag that the starter sets by reflection. The GPU
-process is steered to ANGLE's Vulkan backend, the one that boots on a headless X server and on the
-NVIDIA driver; where Vulkan is missing, Chromium drops back to software rendering by itself. Frames
+process uses Chromium's own choice of graphics backend: forcing ANGLE's Vulkan backend booted on a headless X
+server but, on the NVIDIA machine, lost the Vulkan device and failed to import video frames, which crashed the
+GPU process over and over (frozen page, then a repaint, and hover preview videos that did not play), so Vulkan
+is only an opt-in for headless testing. Where the GPU is unusable, Chromium drops back to software rendering by itself. Frames
 still reach Avalonia through CPU memory, so the GPU accelerates the page, not the final blit. Frames are
 requested at 60 per second and Chromium's smooth scrolling is left on, which is what makes wheel
 scrolling animate instead of jumping a notch at a time; the loader's `--disable-smooth-scrolling` is
@@ -145,7 +147,7 @@ which is what makes the star a toggle rather than a way to bookmark one page twi
 ## One executable, two roles
 
 CEF runs its renderer and GPU work in helper processes. Rather than shipping a second helper
-executable, the app launches itself with CEF's `--type=...` arguments and `CefSubProcess.Run`, the
+executable, the app launches itself with CEF's `--type=...` arguments and `HelperProcess`, the
 first call in `Main`, takes over before any Avalonia code runs. This keeps the release to a single
 managed executable and avoids a helper that has to be found and versioned alongside it.
 

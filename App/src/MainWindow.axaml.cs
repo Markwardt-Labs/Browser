@@ -73,6 +73,12 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Gets the host name of the page being viewed, or an empty string for a blank page.
+    /// </summary>
+    internal string ActiveHost
+        => Uri.TryCreate(tabs.Active?.Address, UriKind.Absolute, out Uri? uri) ? uri.Host : string.Empty;
+
+    /// <summary>
     /// Releases the tabs of a window that is closing while others stay open, so their pages stop running.
     /// </summary>
     internal void CloseTabs()

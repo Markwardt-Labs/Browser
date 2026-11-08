@@ -46,6 +46,7 @@ internal sealed class FilterParser : IFilterParser
         List<string> genericSimple = [];
         List<string> genericComplex = [];
         Dictionary<string, List<CosmeticRule>> hostRules = [];
+        Dictionary<string, List<CosmeticRule>> entityRules = [];
         Dictionary<string, HashSet<string>> hostExceptions = [];
 
         foreach (string raw in lines)
@@ -61,7 +62,7 @@ internal sealed class FilterParser : IFilterParser
 
             if (match.Success)
             {
-                ReadCosmetic(match, genericSimple, genericComplex, hostRules, hostExceptions);
+                ReadCosmetic(match, genericSimple, genericComplex, hostRules, entityRules, hostExceptions);
             }
             else if (ReadNetwork(line) is { } rule)
             {
@@ -76,11 +77,12 @@ internal sealed class FilterParser : IFilterParser
             GenericSimple = genericSimple,
             GenericComplex = genericComplex,
             HostRules = hostRules.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<CosmeticRule>)pair.Value),
+            EntityRules = entityRules.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<CosmeticRule>)pair.Value),
             HostExceptions = hostExceptions.ToDictionary(pair => pair.Key, pair => (IReadOnlySet<string>)pair.Value),
         };
     }
 
-    private void ReadCosmetic(Match match, List<string> genericSimple, List<string> genericComplex, Dictionary<string, List<CosmeticRule>> hostRules, Dictionary<string, HashSet<string>> hostExceptions)
+    private void ReadCosmetic(Match match, List<string> genericSimple, List<string> genericComplex, Dictionary<string, List<CosmeticRule>> hostRules, Dictionary<string, List<CosmeticRule>> entityRules, Dictionary<string, HashSet<string>> hostExceptions)
     {
         string kind = match.Groups["kind"].Value;
         string selector = match.Groups["selector"].Value.Trim();
@@ -92,7 +94,18 @@ internal sealed class FilterParser : IFilterParser
 
         string[] domains = match.Groups["domains"].Value.ToLowerInvariant().Split(',', StringSplitOptions.RemoveEmptyEntries);
 
-        if (domains.Any(domain => domain.Contains('*')))
+        List<string> entities = [.. domains.Where(domain => domain.EndsWith(".*", StringComparison.Ordinal) && domain.IndexOf('*') == domain.Length - 1 && !domain.StartsWith('~')).Select(domain => domain[..^2])];
+        domains = [.. domains.Where(domain => !domain.Contains('*'))];
+
+        if (kind == "##" && entities.Count > 0 && selector.Length > 0)
+        {
+            foreach (string entity in entities)
+            {
+                (entityRules.TryGetValue(entity, out List<CosmeticRule>? entityList) ? entityList : entityRules[entity] = []).Add(new CosmeticRule(selector, []));
+            }
+        }
+
+        if (domains.Length == 0 && entities.Count > 0)
         {
             return;
         }
@@ -203,7 +216,7 @@ internal sealed class FilterParser : IFilterParser
                     types |= type;
                 }
             }
-            else if (name is not ("important" or "match-case" or "all"))
+            else if (!name.StartsWith("redirect=", StringComparison.Ordinal) && name is not ("important" or "match-case" or "all"))
             {
                 return null;
             }
