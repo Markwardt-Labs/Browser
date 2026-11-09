@@ -80,6 +80,12 @@ in to a site survives restarts. Chromium batches its cookie writes and this proc
 giving it a chance to finish them, so the cookie store is flushed on a timer and once more as the window
 closes, with shutdown held until that flush completes (and a short timeout in case it never does).
 
+The process must end with its last window, and an earlier build once stayed alive for days with no window
+(renderers still loaded, later launches handed over to it). The lifetime's own shutdown is therefore backed up
+by a guard on the app's own window list: three seconds after the last window closes, with none reopened, it
+requests the normal shutdown (flush included) and, if the process is still there after that, exits it. A
+closing window always closes its tabs so their renderers are released.
+
 A profile on disk cannot be used by two processes, and CEF's own answer to a second process on one is to
 open a native Chrome window in the first. The app therefore allows one running copy per user: a later
 launch sends its whole command line to the running copy over a named pipe and exits before CEF starts, and

@@ -22,6 +22,8 @@ internal sealed partial class App(ISingleInstance instance, IProfileFolder profi
     private readonly IVideoStats videoStats = new VideoStats(launch.Stats, () => Stopwatch.GetElapsedTime(0));
     private readonly IPointerLocator pointerLocator = new X11PointerLocator();
     private readonly IPointerPlacement pointerPlacement = new PointerPlacement();
+    private IShutdownGuard? shutdownGuard;
+    private IClassicDesktopStyleApplicationLifetime? lifetime;
     private PixelPoint? lastPointer;
     private long lastPointerMove = Stopwatch.GetTimestamp();
 
@@ -36,6 +38,8 @@ internal sealed partial class App(ISingleInstance instance, IProfileFolder profi
         {
             _ = bookmarks.Load();
             _ = adBlocker.Refresh();
+            lifetime = desktop;
+            shutdownGuard = new ShutdownGuard(() => windows.Count > 0, () => RequestShutdown(desktop), ForceExit, (action, delay) => DispatcherTimer.RunOnce(action, delay), TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(8));
             desktop.ShutdownMode = ShutdownMode.OnLastWindowClose;
             MainWindow first = CreateWindow(launch);
             desktop.MainWindow = first;
@@ -73,6 +77,44 @@ internal sealed partial class App(ISingleInstance instance, IProfileFolder profi
 
             _ = recorder.Start(header);
         };
+    }
+
+    private void RequestShutdown(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        NoteLifetime($"no window left after the grace period, shutting down: avalonia windows={desktop.Windows.Count}");
+        desktop.TryShutdown();
+    }
+
+    private void ForceExit()
+    {
+        NoteLifetime("still running after the shutdown request, ending the process");
+
+        // Environment.Exit runs CEF's shutdown, which can wait on browsers forever, so a second path ends the process outright if it does.
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(4));
+            Process.GetCurrentProcess().Kill();
+        });
+
+        Environment.Exit(0);
+    }
+
+    private void NoteLifetime(string message)
+    {
+        if (!launch.Stats)
+        {
+            return;
+        }
+
+        try
+        {
+            string folder = Path.Combine(profile.Location, "stats");
+            Directory.CreateDirectory(folder);
+            File.AppendAllText(Path.Combine(folder, "lifetime.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}{Environment.NewLine}");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     private async Task<StatsContext> DescribeSurroundings()
@@ -120,13 +162,16 @@ internal sealed partial class App(ISingleInstance instance, IProfileFolder profi
         }
 
         windows.Add(window);
+        NoteLifetime($"window opened: app windows={windows.Count} avalonia windows={lifetime?.Windows.Count}");
         window.Closed += (_, _) =>
         {
             windows.Remove(window);
+            window.CloseTabs();
+            NoteLifetime($"window closed: app windows={windows.Count} avalonia windows={lifetime?.Windows.Count}");
 
-            if (windows.Count > 0)
+            if (windows.Count == 0)
             {
-                window.CloseTabs();
+                shutdownGuard?.LastWindowClosed();
             }
         };
 
