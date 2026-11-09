@@ -15,6 +15,15 @@ internal interface IPointerLocator
 /// <inheritdoc />
 internal sealed class X11PointerLocator : IPointerLocator
 {
+    [DllImport("libX11.so.6")]
+    private static extern nint XOpenDisplay(nint name);
+
+    [DllImport("libX11.so.6")]
+    private static extern nint XDefaultRootWindow(nint display);
+
+    [DllImport("libX11.so.6")]
+    private static extern int XQueryPointer(nint display, nint window, out nint root, out nint child, out int rootX, out int rootY, out int windowX, out int windowY, out uint mask);
+
     private nint display;
     private bool unavailable;
 
@@ -44,13 +53,4 @@ internal sealed class X11PointerLocator : IPointerLocator
             return null;
         }
     }
-
-    [DllImport("libX11.so.6")]
-    private static extern nint XOpenDisplay(nint name);
-
-    [DllImport("libX11.so.6")]
-    private static extern nint XDefaultRootWindow(nint display);
-
-    [DllImport("libX11.so.6")]
-    private static extern int XQueryPointer(nint display, nint window, out nint root, out nint child, out int rootX, out int rootY, out int windowX, out int windowY, out uint mask);
 }

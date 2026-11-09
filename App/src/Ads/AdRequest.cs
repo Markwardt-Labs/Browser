@@ -5,8 +5,6 @@ namespace Markwardt.Browser.Ads;
 /// </summary>
 internal sealed record AdRequest
 {
-    private readonly string multiPartSecondLevel = " co com org net gov edu ac or ne go ";
-
     /// <summary>
     /// Takes a request apart.
     /// </summary>
@@ -55,6 +53,8 @@ internal sealed record AdRequest
         HostStarts = starts;
         Tokens = tokens;
     }
+
+    private readonly string multiPartSecondLevel = " co com org net gov edu ac or ne go ";
 
     /// <summary>
     /// Gets what kind of request it is.

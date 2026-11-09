@@ -90,6 +90,8 @@ public sealed partial class MainWindow : Window
     internal string ActiveHost
         => Uri.TryCreate(tabs.Active?.Address, UriKind.Absolute, out Uri? uri) ? uri.Host : string.Empty;
 
+    private bool IsTopBarPinned => launch.Isolate || settings.TopBarVisible;
+
     /// <summary>
     /// Releases the tabs of a window that is closing while others stay open, so their pages stop running.
     /// </summary>
@@ -254,8 +256,6 @@ public sealed partial class MainWindow : Window
             UpdateTopBar();
         }
     }
-
-    private bool IsTopBarPinned => launch.Isolate || settings.TopBarVisible;
 
     private void UpdateTopBar()
     {

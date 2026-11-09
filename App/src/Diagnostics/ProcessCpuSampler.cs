@@ -6,15 +6,15 @@ namespace Markwardt.Browser.Diagnostics;
 internal interface IProcessCpuSampler
 {
     /// <summary>
+    /// Gets how many times the GPU process was replaced since the first reading: Chromium restarts it when it crashes or loses its context, which shows on screen as the page freezing and then repainting.
+    /// </summary>
+    int GpuRestarts { get; }
+
+    /// <summary>
     /// Reads the CPU time used since the previous call. The first call returns everything used since the processes started, so it is only good for starting from.
     /// </summary>
     /// <returns>For the browser process ("browser") and each kind of helper process ("gpu-process", "renderer", "utility", ...), the CPU time used, in hundredths of a second. A helper that exited since the previous call counts for nothing, rather than taking its earlier time away.</returns>
     IReadOnlyDictionary<string, long> Take();
-
-    /// <summary>
-    /// Gets how many times the GPU process was replaced since the first reading: Chromium restarts it when it crashes or loses its context, which shows on screen as the page freezing and then repainting.
-    /// </summary>
-    int GpuRestarts { get; }
 }
 
 /// <inheritdoc />

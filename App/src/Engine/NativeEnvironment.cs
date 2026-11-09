@@ -23,6 +23,12 @@ internal interface INativeEnvironment
 /// <inheritdoc />
 internal sealed class NativeEnvironment : INativeEnvironment
 {
+    [DllImport("libc")]
+    private static extern int setenv([MarshalAs(UnmanagedType.LPUTF8Str)] string name, [MarshalAs(UnmanagedType.LPUTF8Str)] string value, int overwrite);
+
+    [DllImport("libc")]
+    private static extern nint getenv([MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+
     /// <inheritdoc />
     public string? Get(string name)
         => OperatingSystem.IsWindows() ? Environment.GetEnvironmentVariable(name) : Marshal.PtrToStringUTF8(getenv(name));
@@ -39,10 +45,4 @@ internal sealed class NativeEnvironment : INativeEnvironment
             _ = setenv(name, value, 1);
         }
     }
-
-    [DllImport("libc")]
-    private static extern int setenv([MarshalAs(UnmanagedType.LPUTF8Str)] string name, [MarshalAs(UnmanagedType.LPUTF8Str)] string value, int overwrite);
-
-    [DllImport("libc")]
-    private static extern nint getenv([MarshalAs(UnmanagedType.LPUTF8Str)] string name);
 }

@@ -1,4 +1,7 @@
 global using System.IO.Compression;
+global using System.Net;
+global using System.Net.Sockets;
+global using System.Text;
 global using Avalonia;
 global using Avalonia.Input;
 global using Markwardt.Browser.Ads;
@@ -7,8 +10,9 @@ global using Markwardt.Browser.Diagnostics;
 global using Markwardt.Browser.Engine;
 global using Markwardt.Browser.Instance;
 global using Markwardt.Browser.Launch;
-global using Markwardt.Browser.Settings;
 global using Markwardt.Browser.Navigation;
+global using Markwardt.Browser.Profile;
+global using Markwardt.Browser.Settings;
 global using Markwardt.Browser.Shortcuts;
 global using Markwardt.Browser.Sites;
 global using Markwardt.Browser.Tabs;
