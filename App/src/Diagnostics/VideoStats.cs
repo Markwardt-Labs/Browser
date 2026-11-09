@@ -1,17 +1,6 @@
 namespace Markwardt.Browser.Diagnostics;
 
 /// <summary>
-/// How the video playing in a page is doing, as the page itself sees it.
-/// </summary>
-/// <param name="PresentedFps">The video frames shown per second, not counting dropped ones.</param>
-/// <param name="Dropped">The frames dropped since the previous report.</param>
-/// <param name="Width">The width of the video, in pixels.</param>
-/// <param name="Height">The height of the video, in pixels.</param>
-/// <param name="Visibility">The page's visibility state, <c>visible</c> or <c>hidden</c>.</param>
-/// <param name="HasFocus">Whether the page believes it has focus.</param>
-internal sealed record VideoSnapshot(double PresentedFps, int Dropped, int Width, int Height, string Visibility, bool HasFocus);
-
-/// <summary>
 /// Collects the reports that a script in each page sends about its playing video, which says whether Chromium produced the frames, separately from whether the window showed them.
 /// </summary>
 internal interface IVideoStats
@@ -44,7 +33,7 @@ internal sealed class VideoStats(bool isEnabled, Func<TimeSpan> clock) : IVideoS
     private readonly TimeSpan lifetime = TimeSpan.FromSeconds(5);
     private readonly Lock gate = new();
     private readonly Dictionary<string, (VideoSnapshot Snapshot, TimeSpan At)> reports = [];
-    private readonly string? script = isEnabled ? ReadScript() : null;
+    private readonly string? script = isEnabled ? typeof(VideoStats).Assembly.ReadText("Markwardt.Browser.Diagnostics.VideoStats.js") : null;
 
     /// <inheritdoc />
     public string? Script => script;
@@ -82,12 +71,5 @@ internal sealed class VideoStats(bool isEnabled, Func<TimeSpan> clock) : IVideoS
         {
             return reports.Values.Where(report => now - report.At <= lifetime).OrderByDescending(report => (long)report.Snapshot.Width * report.Snapshot.Height).Select(report => report.Snapshot).FirstOrDefault();
         }
-    }
-
-    private static string ReadScript()
-    {
-        using Stream stream = typeof(VideoStats).Assembly.GetManifestResourceStream("Markwardt.Browser.Diagnostics.VideoStats.js")!;
-        using StreamReader reader = new(stream);
-        return reader.ReadToEnd();
     }
 }

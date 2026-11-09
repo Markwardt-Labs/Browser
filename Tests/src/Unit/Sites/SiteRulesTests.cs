@@ -5,11 +5,6 @@ namespace Tests.Unit.Sites;
 /// </summary>
 public sealed class SiteRulesTests
 {
-    private readonly Mock<ISiteRule> first = new();
-    private readonly Mock<ISiteRule> second = new();
-    private readonly Mock<ISiteRule> third = new();
-    private readonly SiteRules rules;
-
     /// <summary>
     /// Creates the set under test over three mock rules.
     /// </summary>
@@ -20,6 +15,11 @@ public sealed class SiteRulesTests
         third.Setup(rule => rule.Script).Returns("third");
         rules = new SiteRules([first.Object, second.Object, third.Object]);
     }
+
+    private readonly Mock<ISiteRule> first = new();
+    private readonly Mock<ISiteRule> second = new();
+    private readonly Mock<ISiteRule> third = new();
+    private readonly SiteRules rules;
 
     /// <summary>
     /// Every matching rule contributes its script, in rule order.

@@ -8,14 +8,7 @@ internal sealed class YouTubeRule : ISiteRule
     private readonly List<string> hosts = ["youtube.com", "youtube-nocookie.com"];
 
     /// <inheritdoc />
-    public string Script { get; } = ReadScript();
-
-    private static string ReadScript()
-    {
-        using Stream stream = typeof(YouTubeRule).Assembly.GetManifestResourceStream("Markwardt.Browser.Sites.YouTube.js")!;
-        using StreamReader reader = new(stream);
-        return reader.ReadToEnd();
-    }
+    public string Script { get; } = typeof(YouTubeRule).Assembly.ReadText("Markwardt.Browser.Sites.YouTube.js");
 
     /// <inheritdoc />
     public bool Matches(string address)

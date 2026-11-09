@@ -42,11 +42,16 @@ internal sealed class BrowserRequests(IAdBlocker blocker) : RequestHandler
             _ => AdResourceType.Other,
         };
 
+    /// <summary>
+    /// Cancels the request it is given.
+    /// </summary>
     private sealed class BlockedRequest : CefResourceRequestHandler
     {
+        /// <inheritdoc />
         protected override CefCookieAccessFilter? GetCookieAccessFilter(CefBrowser browser, CefFrame frame, CefRequest request)
             => null;
 
+        /// <inheritdoc />
         protected override CefReturnValue OnBeforeResourceLoad(CefBrowser browser, CefFrame frame, CefRequest request, CefCallback callback)
             => CefReturnValue.Cancel;
     }

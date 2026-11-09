@@ -5,17 +5,17 @@ namespace Markwardt.Browser;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
-    private readonly IBrowserTabs tabs;
-    private readonly IAddressResolver addressResolver;
-    private readonly IShortcutMap shortcutMap;
-    private readonly IBookmarkList bookmarks;
-    private readonly IUserSettings settings;
-    private readonly LaunchOptions launch;
-    private readonly Action newWindow;
-    private bool showingAddress;
-    private bool matchCase;
-    private IBrowserTab? findTab;
-
+    /// <summary>
+    /// Creates the window.
+    /// </summary>
+    /// <param name="tabs">The tabs the window shows.</param>
+    /// <param name="addressResolver">Decides what the address box text means.</param>
+    /// <param name="shortcutMap">The keyboard shortcuts of the window.</param>
+    /// <param name="bookmarks">The bookmarks shared by all windows.</param>
+    /// <param name="settings">The user's saved settings.</param>
+    /// <param name="launch">The launch options of the window.</param>
+    /// <param name="startInOverview">Whether the window opens on the overview rather than the page.</param>
+    /// <param name="newWindow">Opens another window.</param>
     internal MainWindow(IBrowserTabs tabs, IAddressResolver addressResolver, IShortcutMap shortcutMap, IBookmarkList bookmarks, IUserSettings settings, LaunchOptions launch, bool startInOverview, Action newWindow)
     {
         this.newWindow = newWindow;
@@ -72,6 +72,18 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private readonly IBrowserTabs tabs;
+    private readonly IAddressResolver addressResolver;
+    private readonly IShortcutMap shortcutMap;
+    private readonly IBookmarkList bookmarks;
+    private readonly IUserSettings settings;
+    private readonly LaunchOptions launch;
+    private readonly Action newWindow;
+    private bool showingAddress;
+    private bool matchCase;
+    private IBrowserTab? findTab;
+    private IPageDialog? shownDialog;
+
     /// <summary>
     /// Gets the host name of the page being viewed, or an empty string for a blank page.
     /// </summary>
@@ -100,6 +112,79 @@ public sealed partial class MainWindow : Window
         if (change.Property == WindowStateProperty && Edges is not null)
         {
             Edges.IsVisible = WindowState == WindowState.Normal;
+        }
+    }
+
+    private void UpdateDialog()
+    {
+        IPageDialog? dialog = tabs.Active?.Dialog is { IsAnswered: false } open ? open : null;
+
+        if (ReferenceEquals(dialog, shownDialog))
+        {
+            return;
+        }
+
+        shownDialog = dialog;
+
+        if (dialog is null)
+        {
+            DialogLayer.IsVisible = false;
+            tabs.Active?.Focus();
+            return;
+        }
+
+        if (Overview.IsVisible)
+        {
+            HideOverview();
+        }
+
+        CloseFind(false);
+        DialogOrigin.Text = dialog.Origin.Length > 0 ? $"{dialog.Origin} says" : string.Empty;
+        DialogOrigin.IsVisible = dialog.Origin.Length > 0;
+        DialogMessage.Text = dialog.Message;
+        DialogInput.IsVisible = dialog.Kind == PageDialogKind.Prompt;
+        DialogInput.Text = dialog.DefaultText;
+        DialogCancel.IsVisible = dialog.Kind != PageDialogKind.Alert;
+        DialogCancel.Content = dialog.Kind == PageDialogKind.LeavePage ? "Stay" : "Cancel";
+        DialogOk.Content = dialog.Kind == PageDialogKind.LeavePage ? "Leave" : "OK";
+        DialogLayer.IsVisible = true;
+        tabs.Active?.ReleaseFocus();
+        Activate();
+
+        if (DialogInput.IsVisible)
+        {
+            DialogInput.Focus();
+            DialogInput.SelectAll();
+        }
+        else
+        {
+            DialogOk.Focus();
+        }
+    }
+
+    private void AnswerDialog(bool accepted)
+    {
+        if (shownDialog is not { } dialog)
+        {
+            return;
+        }
+
+        dialog.Answer(accepted, DialogInput.Text ?? string.Empty);
+        UpdateDialog();
+    }
+
+    private void OnDialogOkClick(object? sender, RoutedEventArgs e)
+        => AnswerDialog(true);
+
+    private void OnDialogCancelClick(object? sender, RoutedEventArgs e)
+        => AnswerDialog(false);
+
+    private void OnDialogInputKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            AnswerDialog(true);
+            e.Handled = true;
         }
     }
 
@@ -136,10 +221,23 @@ public sealed partial class MainWindow : Window
         }
 
         RefreshAddress();
+        UpdateDialog();
     }
 
     private void OnTabPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(IBrowserTab.Dialog) && sender is IBrowserTab asking)
+        {
+            if (asking.Dialog is not null && !ReferenceEquals(asking, tabs.Active))
+            {
+                tabs.Select(asking);
+            }
+            else if (ReferenceEquals(asking, tabs.Active))
+            {
+                UpdateDialog();
+            }
+        }
+
         if (e.PropertyName == nameof(IBrowserTab.Address) && ReferenceEquals(sender, tabs.Active))
         {
             RefreshAddress();
@@ -405,6 +503,13 @@ public sealed partial class MainWindow : Window
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        if (DialogLayer.IsVisible && e.Key == Key.Escape)
+        {
+            AnswerDialog(false);
+            e.Handled = true;
+            return;
+        }
+
         if (e.Source is TextBox { IsVisible: true } box && box.Classes.Contains("rename"))
         {
             return;

@@ -5,14 +5,6 @@ namespace Tests.Integration.Diagnostics;
 /// </summary>
 public sealed class StatsRecorderTests : IDisposable
 {
-    private readonly string folder = Path.Combine(Path.GetTempPath(), $"stats-{Guid.NewGuid():N}");
-    private readonly Mock<IFrameStats> frames = new();
-    private readonly Mock<IProcessCpuSampler> cpu = new();
-    private readonly Mock<IUiProbe> ui = new();
-    private readonly Mock<IRequestStats> requests = new();
-    private readonly Mock<IVideoStats> video = new();
-    private readonly StatsRecorder recorder;
-
     /// <summary>
     /// Creates the recorder over mocks that report a busy video page.
     /// </summary>
@@ -27,6 +19,14 @@ public sealed class StatsRecorderTests : IDisposable
         requests.Setup(r => r.Snapshot()).Returns([new RequestStatsEntry("example.com", "ads.example.net", "Script", true, 7), new RequestStatsEntry("example.com", "cdn.example.net", "Image", false, 2)]);
         recorder = new StatsRecorder(frames.Object, cpu.Object, ui.Object, folder, () => Task.FromResult(new StatsContext("example.com", false, "other-screen", 1, 7)), requests.Object, video.Object);
     }
+
+    private readonly string folder = Path.Combine(Path.GetTempPath(), $"stats-{Guid.NewGuid():N}");
+    private readonly Mock<IFrameStats> frames = new();
+    private readonly Mock<IProcessCpuSampler> cpu = new();
+    private readonly Mock<IUiProbe> ui = new();
+    private readonly Mock<IRequestStats> requests = new();
+    private readonly Mock<IVideoStats> video = new();
+    private readonly StatsRecorder recorder;
 
     /// <summary>
     /// Deletes the test folder.

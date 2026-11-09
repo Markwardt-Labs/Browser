@@ -5,10 +5,6 @@ namespace Tests.Unit.Bookmarks;
 /// </summary>
 public sealed class BookmarkListTests
 {
-    private readonly Mock<IBookmarkStorage> storage = new();
-    private readonly List<IReadOnlyList<Bookmark>> saves = [];
-    private readonly BookmarkList list;
-
     /// <summary>
     /// Creates the list under test over a mock storage that records what it is asked to save.
     /// </summary>
@@ -20,6 +16,10 @@ public sealed class BookmarkListTests
             .Returns(Task.CompletedTask);
         list = new BookmarkList(storage.Object);
     }
+
+    private readonly Mock<IBookmarkStorage> storage = new();
+    private readonly List<IReadOnlyList<Bookmark>> saves = [];
+    private readonly BookmarkList list;
 
     /// <summary>
     /// Toggling a page that is not bookmarked adds it, and the list is saved.

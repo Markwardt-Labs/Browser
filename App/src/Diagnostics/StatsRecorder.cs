@@ -156,7 +156,7 @@ internal sealed class StatsRecorder(IFrameStats frames, IProcessCpuSampler cpu, 
     private string RequestsPath(string statsPath)
         => Path.Combine(Path.GetDirectoryName(statsPath)!, Path.GetFileName(statsPath).Replace("stats-", "requests-", StringComparison.Ordinal));
 
-    private async Task Open(CancellationToken cancellation)
+    private async Task Open(CancellationToken cancellation = default)
     {
         string suffix = rollovers == 0 ? string.Empty : $"-{rollovers}";
         path = Path.Combine(folder, $"stats-{DateTime.Now:yyyyMMdd-HHmmss}{suffix}.log");

@@ -5,14 +5,14 @@ namespace Tests.Integration.Bookmarks;
 /// </summary>
 public sealed class BookmarkFileTests : IDisposable
 {
-    private readonly string folder = Path.Combine(Path.GetTempPath(), $"bookmarks-{Guid.NewGuid():N}");
-    private readonly BookmarkFile file;
-
     /// <summary>
     /// Creates a file in a folder that does not exist yet.
     /// </summary>
     public BookmarkFileTests()
         => file = new BookmarkFile(Path.Combine(folder, "bookmarks.json"));
+
+    private readonly string folder = Path.Combine(Path.GetTempPath(), $"bookmarks-{Guid.NewGuid():N}");
+    private readonly BookmarkFile file;
 
     /// <summary>
     /// Deletes the test folder.

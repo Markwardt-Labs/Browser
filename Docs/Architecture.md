@@ -122,13 +122,24 @@ that reacts to a mouse leave loses the element under the click between press and
 hover preview closes, the release lands on the thumbnail beneath, and the click goes to a common
 ancestor instead of the link. `PageBrowser` swallows an exit that happens while it holds the capture.
 
-## Find is the one thing drawn over the page
+## Find floats over the page
 
-Everything else lives in the overview, but finding has to be used while reading the page, so Ctrl+F
+Everything else lives in the overview (apart from the card for a page's own question, below), but finding has to be used while reading the page, so Ctrl+F
 shows a small box floating over the page's corner. It exists only while a search is going on, and
 leaves when the overview opens or the tab changes, so the window is still only the page the rest of
 the time. CEF does the searching and highlighting inside the page; the box just drives it and shows the
 counts CEF reports.
+
+## Page questions are answered in the window
+
+A page can stop and wait for an answer: `alert`, `confirm`, `prompt`, and the "leave this page" check when
+the user goes back, follows a link or reloads. Left to CEF these open a separate native window, which on a
+real desktop can end up behind the browser; the page is then waiting on a window nobody sees and the tab
+looks frozen, most often exactly when going back or clicking a link. `BrowserDialogs` instead hands each
+question to the tab, and the window shows it as a small card over the page (a question from a background
+tab switches to that tab first). Enter answers OK or Leave, Esc answers Cancel or Stay. The page is
+unblocked only by an answer, so every question gets one; a question that stops applying because the page
+moved on is dropped.
 
 ## Several windows share one process
 

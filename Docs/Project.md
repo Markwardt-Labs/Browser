@@ -5,8 +5,7 @@ Documentation for this repository's own tooling and workflow.
 ## Scripts
 
 `Scripts/` holds file-based C# apps (`dotnet run Scripts/<Name>.cs`, from the root) and tasks for
-automated repository actions. Only what a developer runs by hand is in the folder itself; what
-those are built from is in `Scripts/Support/`.
+automated repository actions.
 
 - `Scripts/Run.cs` - builds the app, adds codec support to the build output, and runs it locally.
 - `Scripts/Install.cs` - publishes the app as one executable with codec support, and installs it for the

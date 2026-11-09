@@ -1,13 +1,6 @@
 namespace Markwardt.Browser.Diagnostics;
 
 /// <summary>
-/// How late the UI thread has been when asked to run something, since the last time it was taken.
-/// </summary>
-/// <param name="MaxLateMilliseconds">The longest delay.</param>
-/// <param name="Stalls">How many times the delay was over 50 ms.</param>
-internal sealed record UiProbeSnapshot(double MaxLateMilliseconds, int Stalls);
-
-/// <summary>
 /// Measures whether the UI thread is keeping up, which is what input and animation lag come down to.
 /// </summary>
 internal interface IUiProbe
@@ -22,13 +15,6 @@ internal interface IUiProbe
 /// <inheritdoc />
 internal sealed class UiProbe : IUiProbe
 {
-    private readonly Lock gate = new();
-    private readonly TimeSpan interval = TimeSpan.FromMilliseconds(20);
-    private readonly long start = Stopwatch.GetTimestamp();
-    private TimeSpan last;
-    private double maxLate;
-    private int stalls;
-
     /// <summary>
     /// Starts measuring. Must be created on the UI thread.
     /// </summary>
@@ -38,6 +24,13 @@ internal sealed class UiProbe : IUiProbe
         DispatcherTimer timer = new(interval, DispatcherPriority.Normal, (_, _) => Tick());
         timer.Start();
     }
+
+    private readonly Lock gate = new();
+    private readonly TimeSpan interval = TimeSpan.FromMilliseconds(20);
+    private readonly long start = Stopwatch.GetTimestamp();
+    private TimeSpan last;
+    private double maxLate;
+    private int stalls;
 
     /// <inheritdoc />
     public UiProbeSnapshot Take()

@@ -35,3 +35,6 @@ local application data folder, which takes a few seconds:
 | [Docs/Usage.md](Docs/Usage.md) | Using the browser and running it from source |
 | [Docs/Architecture.md](Docs/Architecture.md) | Why it is built the way it is |
 | [Docs/Project.md](Docs/Project.md) | This repository's scripts, publishing and CI |
+| [Docs/Components/AdBlocking.md](Docs/Components/AdBlocking.md) | How ads are blocked |
+| [Docs/Components/SiteRules.md](Docs/Components/SiteRules.md) | Per-site scripts and video mode |
+| [Docs/Components/Performance.md](Docs/Components/Performance.md) | What was measured about speed, and what had no effect |

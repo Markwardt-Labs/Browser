@@ -5,9 +5,6 @@ namespace Tests.Unit.Settings;
 /// </summary>
 public sealed class UserSettingsTests
 {
-    private readonly Mock<ISettingsStorage> storage = new();
-    private readonly UserSettings settings;
-
     /// <summary>
     /// Creates the settings under test over a mock storage that has nothing saved.
     /// </summary>
@@ -17,6 +14,9 @@ public sealed class UserSettingsTests
         storage.Setup(s => s.Save(It.IsAny<SettingsData>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         settings = new UserSettings(storage.Object);
     }
+
+    private readonly Mock<ISettingsStorage> storage = new();
+    private readonly UserSettings settings;
 
     /// <summary>
     /// The top bar shows outside the overview until chosen otherwise.

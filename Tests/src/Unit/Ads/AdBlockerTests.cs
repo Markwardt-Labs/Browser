@@ -5,10 +5,6 @@ namespace Tests.Unit.Ads;
 /// </summary>
 public sealed class AdBlockerTests
 {
-    private readonly Mock<IFilterLists> lists = new();
-    private readonly Mock<IRequestStats> stats = new();
-    private readonly AdBlocker blocker;
-
     /// <summary>
     /// Creates the blocker over a mock list source.
     /// </summary>
@@ -17,6 +13,10 @@ public sealed class AdBlockerTests
         lists.Setup(l => l.Read(It.IsAny<CancellationToken>())).ReturnsAsync(["||ads.example.com^\n||tracker.net^$third-party\n@@||ads.example.com/allowed/\n/banners/*/ad_\n|https://exact.example/ad.js|\n||media.example^$media\n||pop.example^$popup\n||site-only.example^$domain=a.com|~sub.a.com\n||wild.example/a*b^\n||redirected.example^$script,redirect=noopjs\nexample.com##.promo\nshop.*##.entity-ad\n##.generic-ad\n###sidebar-ad\nexample.com#@#.generic-ad\n"]);
         blocker = new AdBlocker(new FilterParser(), lists.Object, new YouTubeAdScript(), stats.Object);
     }
+
+    private readonly Mock<IFilterLists> lists = new();
+    private readonly Mock<IRequestStats> stats = new();
+    private readonly AdBlocker blocker;
 
     /// <summary>
     /// Until the lists are loaded nothing is blocked.

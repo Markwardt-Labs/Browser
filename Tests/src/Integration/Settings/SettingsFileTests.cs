@@ -5,14 +5,14 @@ namespace Tests.Integration.Settings;
 /// </summary>
 public sealed class SettingsFileTests : IDisposable
 {
-    private readonly string folder = Path.Combine(Path.GetTempPath(), $"settings-{Guid.NewGuid():N}");
-    private readonly SettingsFile file;
-
     /// <summary>
     /// Creates a file in a folder that does not exist yet.
     /// </summary>
     public SettingsFileTests()
         => file = new SettingsFile(Path.Combine(folder, "settings.json"));
+
+    private readonly string folder = Path.Combine(Path.GetTempPath(), $"settings-{Guid.NewGuid():N}");
+    private readonly SettingsFile file;
 
     /// <summary>
     /// Deletes the test folder.

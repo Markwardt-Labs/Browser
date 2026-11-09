@@ -52,7 +52,7 @@ internal sealed class SingleInstance(string name) : ISingleInstance
     private NamedPipeServerStream Create()
         => new(name, PipeDirection.In, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
-    private async Task Accept(Action<IReadOnlyList<string>> received, CancellationToken cancellation)
+    private async Task Accept(Action<IReadOnlyList<string>> received, CancellationToken cancellation = default)
     {
         NamedPipeServerStream current = server ?? throw new InvalidOperationException("Claim must succeed before listening.");
 
@@ -65,7 +65,7 @@ internal sealed class SingleInstance(string name) : ISingleInstance
         }
     }
 
-    private async Task Receive(NamedPipeServerStream connected, Action<IReadOnlyList<string>> received, CancellationToken cancellation)
+    private async Task Receive(NamedPipeServerStream connected, Action<IReadOnlyList<string>> received, CancellationToken cancellation = default)
     {
         await using (connected)
         {

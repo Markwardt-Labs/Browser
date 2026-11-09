@@ -5,13 +5,6 @@ namespace Markwardt.Browser.Tabs;
 /// </summary>
 internal sealed class PageBrowser : AvaloniaCefBrowser
 {
-    private readonly BrowserTooltips tooltips;
-    private readonly IFrameStats frameStats;
-    private string hoveredLink = string.Empty;
-    private bool swallowingClick;
-    private Point tooltipOrigin;
-    private Point lastPosition;
-
     /// <summary>
     /// Creates the control.
     /// </summary>
@@ -37,7 +30,15 @@ internal sealed class PageBrowser : AvaloniaCefBrowser
         AddHandler(PointerPressedEvent, (_, _) => HideTooltip(), RoutingStrategies.Bubble, true);
         AddHandler(PointerWheelChangedEvent, (_, _) => HideTooltip(), RoutingStrategies.Bubble, true);
         AddHandler(KeyDownEvent, (_, _) => HideTooltip(), RoutingStrategies.Bubble, true);
+        AddHandler(KeyDownEvent, OnKeyDownOverPage, RoutingStrategies.Bubble, true);
     }
+
+    private readonly BrowserTooltips tooltips;
+    private readonly IFrameStats frameStats;
+    private string hoveredLink = string.Empty;
+    private bool swallowingClick;
+    private Point tooltipOrigin;
+    private Point lastPosition;
 
     /// <summary>
     /// Raised, on a CEF thread, with the number of matches of the current find and the position of the active one.
@@ -151,6 +152,34 @@ internal sealed class PageBrowser : AvaloniaCefBrowser
         int height = type.GetProperty("Height")?.GetValue(args) as int? ?? 0;
         CefRectangle[]? rects = type.GetProperty("DirtyRects")?.GetValue(args) as CefRectangle[];
         frameStats.Painted(width, height, rects?.Sum(rect => (long)rect.Width * rect.Height) ?? 0);
+    }
+
+    private void OnKeyDownOverPage(object? sender, KeyEventArgs e)
+    {
+        // Avalonia raises no text input for Enter, and the control only sends Chromium a character event for text input, so without this Enter never submits a form or breaks a line (keypress is what those listen to).
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        CefEventFlags modifiers = CefEventFlags.None;
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            modifiers |= CefEventFlags.ControlDown;
+        }
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            modifiers |= CefEventFlags.ShiftDown;
+        }
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+        {
+            modifiers |= CefEventFlags.AltDown;
+        }
+
+        UnderlyingBrowser?.GetHost().SendKeyEvent(new CefKeyEvent { EventType = CefKeyEventType.Char, WindowsKeyCode = '\r', Character = '\r', Modifiers = modifiers });
     }
 
     private void OnPointerPressedOverPage(object? sender, PointerPressedEventArgs e)

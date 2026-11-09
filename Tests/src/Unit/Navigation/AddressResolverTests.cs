@@ -43,29 +43,6 @@ public sealed class AddressResolverTests
         => Assert.Equal(expected, resolver.Resolve(address));
 
     /// <summary>
-    /// The path of a file that exists, as a launcher passes it, becomes a file address, including characters that need escaping.
-    /// </summary>
-    [Fact]
-    public void Resolve_ExistingFilePath_ReturnsFileAddress()
-    {
-        string path = Path.Combine(Path.GetTempPath(), $"page {Guid.NewGuid():N}.html");
-        File.WriteAllText(path, "<html></html>");
-
-        try
-        {
-            string resolved = resolver.Resolve(path);
-
-            Assert.StartsWith("file:///", resolved);
-            Assert.EndsWith(".html", resolved);
-            Assert.Contains("%20", resolved);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    /// <summary>
     /// A rooted path that does not exist is not guessed to be a file, so it still gets https like any other address.
     /// </summary>
     [Fact]

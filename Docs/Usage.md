@@ -74,6 +74,12 @@ shows which one is active out of how many. Enter (or the down arrow) goes to the
 (or the up arrow) to the previous one, Aa makes the search case sensitive, and Esc or the cross closes
 it. The box goes away on its own when you open the overview or switch tabs.
 
+## Questions from pages
+
+When a page asks something (an alert, a confirm or prompt, or "leave this page?" when going back,
+following a link or reloading with unsaved changes) a card appears over the page. Enter answers OK or
+Leave, Esc answers Cancel or Stay. The page waits until it is answered.
+
 ## Ads
 
 Ads are blocked without any setup. Requests to ad networks are cancelled before they load, elements that
@@ -150,6 +156,8 @@ window has focus (`active`), where the mouse pointer is (`pointer`: over the win
 screen, or on another screen), how long it has been still (`idle`) and which screen the window is on, how many
 frames a second changed at least a quarter of the window (`big`, which is what a playing video does), how the playing video is doing as the page sees
 it (`video` frames per second shown, `dropped` frames) and the site being viewed.
+`stats/lifetime.log` notes each window opening and closing (with Avalonia's own window count) and when the
+process is told to end after the last window closes.
 The ad blocker's decisions go to `requests-<date>-<time>.log` beside it: what was blocked, which popups were
 refused and which requests to other sites were let through. It records host names only, never full addresses.
 

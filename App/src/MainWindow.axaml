@@ -35,6 +35,20 @@
           </Button>
         </StackPanel>
       </Border>
+
+      <Border x:Name="DialogLayer" IsVisible="False" Background="#99000000">
+        <Border Classes="dialog">
+          <StackPanel Spacing="12">
+            <TextBlock x:Name="DialogOrigin" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="DialogMessage" TextWrapping="Wrap" FontSize="14" />
+            <TextBox x:Name="DialogInput" Classes="address" IsVisible="False" KeyDown="OnDialogInputKeyDown" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+              <Button x:Name="DialogCancel" MinWidth="80" HorizontalContentAlignment="Center" Click="OnDialogCancelClick" />
+              <Button x:Name="DialogOk" Classes="accent" MinWidth="80" HorizontalContentAlignment="Center" Click="OnDialogOkClick" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </Border>
     </Grid>
 
     <Border x:Name="Overview" IsVisible="False" Margin="0,44,0,0" Background="{DynamicResource Scrim}">

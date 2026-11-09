@@ -5,10 +5,6 @@ namespace Tests.Unit.Tabs;
 /// </summary>
 public sealed class BrowserTabsTests
 {
-    private readonly Mock<IBrowserTab.IFactory> factory = new();
-    private readonly List<Mock<IBrowserTab>> created = [];
-    private readonly BrowserTabs tabs;
-
     /// <summary>
     /// Creates the collection under test over a factory that hands out mock tabs.
     /// </summary>
@@ -25,6 +21,10 @@ public sealed class BrowserTabsTests
 
         tabs = new BrowserTabs(factory.Object);
     }
+
+    private readonly Mock<IBrowserTab.IFactory> factory = new();
+    private readonly List<Mock<IBrowserTab>> created = [];
+    private readonly BrowserTabs tabs;
 
     /// <summary>
     /// Opening a tab adds it and makes it the active one.

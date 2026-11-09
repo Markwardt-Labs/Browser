@@ -5,10 +5,6 @@ namespace Tests.Integration.Ads;
 /// </summary>
 public sealed class FilterListsTests : IDisposable
 {
-    private readonly string folder = Path.Combine(Path.GetTempPath(), $"filters-{Guid.NewGuid():N}");
-    private readonly Mock<IFilterDownloader> downloader = new();
-    private readonly FilterLists lists;
-
     /// <summary>
     /// Creates the lists over a mock downloader and one source.
     /// </summary>
@@ -17,6 +13,10 @@ public sealed class FilterListsTests : IDisposable
         downloader.Setup(d => d.Download("https://lists.example/a.txt", It.IsAny<CancellationToken>())).ReturnsAsync("[Adblock Plus 2.0]\n||downloaded.example^\n");
         lists = new FilterLists(folder, [new FilterListSource { Name = "a", Url = "https://lists.example/a.txt" }], downloader.Object, typeof(AdBlocker).Assembly);
     }
+
+    private readonly string folder = Path.Combine(Path.GetTempPath(), $"filters-{Guid.NewGuid():N}");
+    private readonly Mock<IFilterDownloader> downloader = new();
+    private readonly FilterLists lists;
 
     /// <summary>
     /// Deletes the test folder.

@@ -44,13 +44,17 @@ window, with only the active one visible, so background tabs keep running.
    in the active tab, a middle click opens it in a new tab, its pencil renames it in place (Enter or
    leaving the field saves, Esc discards), and its cross removes it. Every change is
    saved straight away to a file in the profile folder, and the list is read back at start.
-5. **Tabs** - choosing a card makes its tab active; the close button or a middle click closes it. A
-   page opening a window (`target=_blank`, `window.open`), "Open link in new tab" and "View page
-   source" all become tabs through the tab's new-tab request, and F2, Ctrl+T or the new-tab button opens a
-   blank one with the overview up for an address.
+5. **Tabs** - choosing a card makes its tab active; the close button or a middle click closes it. "Open
+   link in new tab", "View page source" and a middle or Alt click on a link become tabs through the tab's
+   new-tab request, and F2, Ctrl+T or the new-tab button opens a blank one with the overview up for an
+   address. A page's own request for a window (`target=_blank`, `window.open`) loads in the current tab
+   instead, so tabs are only created by the user.
 6. **Right-click** - CEF hands over its context menu model, which is shown as an Avalonia menu at
    the click position; choosing an entry runs it, and dismissing the menu cancels it.
-7. **Later launches** - while the browser runs, starting it again opens the given address (or a blank
-   tab with the overview up) in the running window and brings that window forward.
+7. **Later launches** - while the browser runs, starting it again opens a new window in the running
+   copy for the given command line (a blank tab with the overview up if it names no address) and brings
+   it forward.
 8. **Shortcuts** - a key press resolves through `ShortcutMap` to a command that the window runs,
    whether it arrived through Avalonia or through CEF's keyboard handler.
+9. **Page questions** - when a page blocks on an alert, confirm, prompt or "leave this page?" check, the
+   tab raises it as a question and the window shows it over the page until it is answered.

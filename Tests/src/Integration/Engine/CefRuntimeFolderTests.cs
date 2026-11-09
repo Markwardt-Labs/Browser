@@ -5,12 +5,6 @@ namespace Tests.Integration.Engine;
 /// </summary>
 public sealed class CefRuntimeFolderTests : IDisposable
 {
-    private readonly string root = Path.Combine(Path.GetTempPath(), $"runtime-{Guid.NewGuid():N}");
-    private readonly string beside;
-    private readonly string cache;
-    private readonly string library = OperatingSystem.IsWindows() ? "libcef.dll" : "libcef.so";
-    private readonly Mock<ICefRuntimeArchive> archive = new();
-
     /// <summary>
     /// Creates an empty executable folder and cache folder, and an archive that holds a library and a resource folder.
     /// </summary>
@@ -22,6 +16,12 @@ public sealed class CefRuntimeFolderTests : IDisposable
         archive.Setup(a => a.Id).Returns("abc123");
         archive.Setup(a => a.Open()).Returns(() => Pack(library, "locales/en-US.pak"));
     }
+
+    private readonly string root = Path.Combine(Path.GetTempPath(), $"runtime-{Guid.NewGuid():N}");
+    private readonly string beside;
+    private readonly string cache;
+    private readonly string library = OperatingSystem.IsWindows() ? "libcef.dll" : "libcef.so";
+    private readonly Mock<ICefRuntimeArchive> archive = new();
 
     /// <summary>
     /// Deletes the test folders.

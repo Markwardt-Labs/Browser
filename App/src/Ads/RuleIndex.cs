@@ -21,9 +21,6 @@ internal interface IRuleIndex
 /// <inheritdoc />
 internal sealed class RuleIndex : IRuleIndex
 {
-    private readonly Dictionary<string, List<NetworkRule>> byToken = [];
-    private readonly List<NetworkRule> loose = [];
-
     /// <summary>
     /// Builds the index.
     /// </summary>
@@ -49,6 +46,9 @@ internal sealed class RuleIndex : IRuleIndex
             }
         }
     }
+
+    private readonly Dictionary<string, List<NetworkRule>> byToken = [];
+    private readonly List<NetworkRule> loose = [];
 
     /// <inheritdoc />
     public int Count { get; }

@@ -8,14 +8,7 @@ internal sealed class VideoModeRule : ISiteRule
     private readonly List<string> schemes = [Uri.UriSchemeHttps, Uri.UriSchemeHttp, Uri.UriSchemeFile];
 
     /// <inheritdoc />
-    public string Script { get; } = ReadScript();
-
-    private static string ReadScript()
-    {
-        using Stream stream = typeof(VideoModeRule).Assembly.GetManifestResourceStream("Markwardt.Browser.Sites.VideoMode.js")!;
-        using StreamReader reader = new(stream);
-        return reader.ReadToEnd();
-    }
+    public string Script { get; } = typeof(VideoModeRule).Assembly.ReadText("Markwardt.Browser.Sites.VideoMode.js");
 
     /// <inheritdoc />
     public bool Matches(string address)

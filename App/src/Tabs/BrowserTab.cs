@@ -26,6 +26,11 @@ internal interface IBrowserTab : INotifyPropertyChanged
     string Title { get; }
 
     /// <summary>
+    /// Gets the question the page is blocked on until the user answers it, or null.
+    /// </summary>
+    IPageDialog? Dialog { get; }
+
+    /// <summary>
     /// Gets the address currently loaded.
     /// </summary>
     string Address { get; }
@@ -145,16 +150,6 @@ internal interface IBrowserTab : INotifyPropertyChanged
 /// <inheritdoc cref="IBrowserTab" />
 internal sealed class BrowserTab : ObservableObject, IBrowserTab
 {
-    private readonly PageBrowser browser;
-    private readonly IAdBlocker adBlocker;
-    private readonly IVideoStats videoStats;
-    private string title = string.Empty;
-    private string address;
-    private RenderTargetBitmap? thumbnail;
-    private bool isActive;
-    private bool canGoBack;
-    private bool canGoForward;
-
     /// <summary>
     /// Creates a tab and starts loading an address.
     /// </summary>
@@ -175,6 +170,7 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
         browser.Settings.WindowlessFrameRate = 60;
         browser.ContextMenuHandler = new BrowserContextMenu(browser, Open);
         browser.LinkOpenRequested += Open;
+        browser.JSDialogHandler = new BrowserDialogs(question => Dispatcher.UIThread.Post(() => Dialog = question), () => Dispatcher.UIThread.Post(() => Dialog = null));
         browser.FindResult += (count, active) => Dispatcher.UIThread.Post(() => FindResultChanged?.Invoke(count, active));
         browser.LifeSpanHandler = new BrowserPopups(adBlocker, (url, background) => Dispatcher.UIThread.Post(() => Open(url, background ? LinkTarget.BackgroundTab : LinkTarget.Current)));
         browser.LoadingStateChange += (_, state) => Dispatcher.UIThread.Post(() =>
@@ -206,6 +202,17 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
         browser.TitleChanged += (_, value) => Dispatcher.UIThread.Post(() => Title = value is null or "about:blank" ? string.Empty : value);
     }
 
+    private readonly PageBrowser browser;
+    private readonly IAdBlocker adBlocker;
+    private readonly IVideoStats videoStats;
+    private string title = string.Empty;
+    private string address;
+    private IPageDialog? dialog;
+    private RenderTargetBitmap? thumbnail;
+    private bool isActive;
+    private bool canGoBack;
+    private bool canGoForward;
+
     /// <inheritdoc />
     public event Action<string, bool>? NewTabRequested;
 
@@ -220,6 +227,13 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
     {
         get => title;
         private set => Set(ref title, value);
+    }
+
+    /// <inheritdoc />
+    public IPageDialog? Dialog
+    {
+        get => dialog;
+        private set => Set(ref dialog, value);
     }
 
     /// <inheritdoc />
@@ -322,6 +336,7 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
     /// <inheritdoc />
     public void Close()
     {
+        dialog = null;
         browser.Dispose();
         thumbnail?.Dispose();
     }
