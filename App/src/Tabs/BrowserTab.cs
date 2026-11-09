@@ -133,11 +133,12 @@ internal interface IBrowserTab : INotifyPropertyChanged
     /// <param name="siteRules">The per-site adjustments the tabs apply to the pages they load.</param>
     /// <param name="adBlocker">Decides what the tabs keep out of the pages they load.</param>
     /// <param name="frameStats">Counts the frames the pages deliver, when diagnostics are on.</param>
-    sealed class Factory(IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker, IFrameStats frameStats) : IFactory
+    /// <param name="videoStats">Collects what pages report about their playing video, when diagnostics are on.</param>
+    sealed class Factory(IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker, IFrameStats frameStats, IVideoStats videoStats) : IFactory
     {
         /// <inheritdoc />
         public IBrowserTab Create(string address)
-            => new BrowserTab(address, shortcuts, siteRules, adBlocker, frameStats);
+            => new BrowserTab(address, shortcuts, siteRules, adBlocker, frameStats, videoStats);
     }
 }
 
@@ -146,6 +147,7 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
 {
     private readonly PageBrowser browser;
     private readonly IAdBlocker adBlocker;
+    private readonly IVideoStats videoStats;
     private string title = string.Empty;
     private string address;
     private RenderTargetBitmap? thumbnail;
@@ -161,8 +163,10 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
     /// <param name="siteRules">The per-site adjustments to apply to every frame that loads.</param>
     /// <param name="adBlocker">Decides what to keep out of the page.</param>
     /// <param name="frameStats">Counts the frames the page delivers, when diagnostics are on.</param>
-    public BrowserTab(string address, IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker, IFrameStats frameStats)
+    /// <param name="videoStats">Collects what the page reports about its playing video, when diagnostics are on.</param>
+    public BrowserTab(string address, IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker, IFrameStats frameStats, IVideoStats videoStats)
     {
+        this.videoStats = videoStats;
         browser = new PageBrowser(frameStats);
         this.address = address;
         this.adBlocker = adBlocker;
@@ -181,6 +185,12 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
         browser.KeyboardHandler = new BrowserKeys(shortcuts, command => Dispatcher.UIThread.Post(() => ShortcutPressed?.Invoke(command)));
         browser.Address = address;
         browser.RequestHandler = new BrowserRequests(adBlocker);
+
+        if (videoStats.Script is not null)
+        {
+            browser.ConsoleMessage += (_, console) => videoStats.Note(console.Source ?? string.Empty, console.Message ?? string.Empty);
+        }
+
         browser.LoadStart += (_, started) => HideAds(started.Frame);
         browser.LoadEnd += (_, loaded) =>
         {
@@ -323,6 +333,11 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
         if (adBlocker.FrameScript(address, frame.IsMain) is { } script)
         {
             frame.ExecuteJavaScript(script, address, 0);
+        }
+
+        if (videoStats.Script is { } statsScript && address.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            frame.ExecuteJavaScript(statsScript, address, 0);
         }
     }
 

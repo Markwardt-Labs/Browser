@@ -10,14 +10,20 @@ namespace Markwardt.Browser;
 /// <param name="launch">What this launch's command line asked for, for the first window.</param>
 /// <param name="adBlocker">Keeps ads out of every page.</param>
 /// <param name="requestStats">Counts what the ad blocker decided, when diagnostics are on.</param>
-internal sealed partial class App(ISingleInstance instance, IProfileFolder profile, IUserSettings settings, ILaunchParser launchParser, LaunchOptions launch, IAdBlocker adBlocker, IRequestStats requestStats) : Application
+/// <param name="graphics">The graphics environment variables that were set at startup, for the diagnostics header.</param>
+internal sealed partial class App(ISingleInstance instance, IProfileFolder profile, IUserSettings settings, ILaunchParser launchParser, LaunchOptions launch, IAdBlocker adBlocker, IRequestStats requestStats, IReadOnlyList<KeyValuePair<string, string>> graphics) : Application
 {
     private readonly IAddressResolver addressResolver = new AddressResolver();
     private readonly IShortcutMap shortcutMap = new ShortcutMap();
     private readonly ISiteRules siteRules = new SiteRules([new VideoModeRule(), new YouTubeRule()]);
     private readonly IBookmarkList bookmarks = new BookmarkList(new BookmarkFile(Path.Combine(profile.Location, "bookmarks.json")));
     private readonly List<MainWindow> windows = [];
-    private readonly IFrameStats frameStats = new FrameStats(launch.Stats, action => Dispatcher.UIThread.Post(action), () => Stopwatch.GetElapsedTime(0));
+    private readonly IFrameStats frameStats = new FrameStats(launch.Stats, action => Dispatcher.UIThread.Post(action), action => (Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow?.RequestAnimationFrame(_ => action()), () => Stopwatch.GetElapsedTime(0));
+    private readonly IVideoStats videoStats = new VideoStats(launch.Stats, () => Stopwatch.GetElapsedTime(0));
+    private readonly IPointerLocator pointerLocator = new X11PointerLocator();
+    private readonly IPointerPlacement pointerPlacement = new PointerPlacement();
+    private PixelPoint? lastPointer;
+    private long lastPointerMove = Stopwatch.GetTimestamp();
 
     /// <inheritdoc />
     public override void Initialize()
@@ -48,7 +54,7 @@ internal sealed partial class App(ISingleInstance instance, IProfileFolder profi
             return;
         }
 
-        IStatsRecorder recorder = new StatsRecorder(frameStats, new ProcessCpuSampler("/proc", Environment.ProcessId), new UiProbe(), Path.Combine(profile.Location, "stats"), () => windows.FirstOrDefault(window => window.IsActive)?.ActiveHost ?? windows.FirstOrDefault()?.ActiveHost ?? string.Empty, requestStats);
+        IStatsRecorder recorder = new StatsRecorder(frameStats, new ProcessCpuSampler("/proc", Environment.ProcessId), new UiProbe(), Path.Combine(profile.Location, "stats"), DescribeSurroundings, requestStats, videoStats);
 
         first.Opened += async (_, _) =>
         {
@@ -59,6 +65,7 @@ internal sealed partial class App(ISingleInstance instance, IProfileFolder profi
                 $"runtime: {RuntimeInformation.FrameworkDescription}, avalonia {typeof(Application).Assembly.GetName().Version}",
                 $"session: type={Environment.GetEnvironmentVariable("XDG_SESSION_TYPE")} desktop={Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP")} display={Environment.GetEnvironmentVariable("DISPLAY")} wayland={Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")}",
                 $"command line: {string.Join(' ', Environment.GetCommandLineArgs().Skip(1))}",
+                $"graphics environment set at startup: {(graphics.Count == 0 ? "nothing" : string.Join(' ', graphics.Select(pair => $"{pair.Key}={pair.Value}")))} (swap sync off lets Avalonia's one render thread serve several windows without waiting on the screen refresh in turn)",
                 $"graphics backend asked of chromium: {Environment.GetEnvironmentVariable("MARKWARDT_ANGLE") ?? "its own default"}",
                 $"libcef: {Process.GetCurrentProcess().Modules.Cast<ProcessModule>().Where(module => module.ModuleName.StartsWith("libcef", StringComparison.Ordinal)).Select(module => $"{module.FileName}, {new FileInfo(module.FileName).Length / 1_000_000} MB").FirstOrDefault() ?? "not found"} (538 MB is the build with H.264 and AAC, 277 MB the stock one)",
                 .. await new RenderingInfo().Describe(first),
@@ -68,9 +75,33 @@ internal sealed partial class App(ISingleInstance instance, IProfileFolder profi
         };
     }
 
+    private async Task<StatsContext> DescribeSurroundings()
+        => await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            MainWindow? active = windows.FirstOrDefault(window => window.IsActive);
+            MainWindow? target = active ?? windows.FirstOrDefault();
+
+            if (target is null)
+            {
+                return new StatsContext(string.Empty, false, "unknown", -1, 0);
+            }
+
+            PixelRect area = new(target.Position, new PixelSize((int)(target.Bounds.Width * target.RenderScaling), (int)(target.Bounds.Height * target.RenderScaling)));
+            PixelPoint? position = pointerLocator.Locate();
+
+            if (position != lastPointer)
+            {
+                lastPointer = position;
+                lastPointerMove = Stopwatch.GetTimestamp();
+            }
+
+            string pointer = pointerPlacement.Classify(position, area, [.. target.Screens.All.Select(screen => screen.Bounds)], out int screen);
+            return new StatsContext(target.ActiveHost, active is not null, pointer, screen, (int)Stopwatch.GetElapsedTime(lastPointerMove).TotalSeconds);
+        });
+
     private MainWindow CreateWindow(LaunchOptions options)
     {
-        IBrowserTabs tabs = new BrowserTabs(new IBrowserTab.Factory(shortcutMap, siteRules, adBlocker, frameStats), options.Isolate);
+        IBrowserTabs tabs = new BrowserTabs(new IBrowserTab.Factory(shortcutMap, siteRules, adBlocker, frameStats, videoStats), options.Isolate);
         tabs.Open(addressResolver.Resolve(options.Goto ?? options.Address ?? string.Empty));
         MainWindow window = new(tabs, addressResolver, shortcutMap, bookmarks, settings, options, !options.Isolate && options.Goto is null, OpenNewWindow);
 

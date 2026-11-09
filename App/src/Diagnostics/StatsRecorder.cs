@@ -33,13 +33,17 @@ internal interface IStatsRecorder
 /// <param name="cpu">Reads CPU use.</param>
 /// <param name="ui">Measures the UI thread.</param>
 /// <param name="folder">The folder the logs go in.</param>
-/// <param name="page">Gets the host name of the page being viewed, or an empty string.</param>
+/// <param name="context">Gets what is going on around the window: the page, focus and where the pointer is. Called from a background thread.</param>
 /// <param name="requests">Counts what the ad blocker decided.</param>
-internal sealed class StatsRecorder(IFrameStats frames, IProcessCpuSampler cpu, IUiProbe ui, string folder, Func<string> page, IRequestStats requests) : IStatsRecorder
+/// <param name="video">Collects what pages report about their playing video.</param>
+/// <param name="maxBytes">The size at which the log is closed and a new one started, so that a browser left open for days does not fill the disk.</param>
+internal sealed class StatsRecorder(IFrameStats frames, IProcessCpuSampler cpu, IUiProbe ui, string folder, Func<Task<StatsContext>> context, IRequestStats requests, IVideoStats video, long maxBytes = 20_000_000) : IStatsRecorder
 {
     private readonly int keep = 10;
     private readonly long start = Stopwatch.GetTimestamp();
     private string path = string.Empty;
+    private IReadOnlyList<string> header = [];
+    private int rollovers;
     private TimeSpan lastTime;
     private int[] lastCollections = [0, 0, 0];
     private TimeSpan lastPause;
@@ -49,15 +53,8 @@ internal sealed class StatsRecorder(IFrameStats frames, IProcessCpuSampler cpu, 
     public async Task Start(IReadOnlyList<string> header, CancellationToken cancellation = default)
     {
         Directory.CreateDirectory(folder);
-        path = Path.Combine(folder, $"stats-{DateTime.Now:yyyyMMdd-HHmmss}.log");
-
-        foreach (string old in Directory.GetFiles(folder, "stats-*.log").OrderByDescending(file => file).Skip(keep - 1))
-        {
-            File.Delete(old);
-            File.Delete(RequestsPath(old));
-        }
-
-        await File.WriteAllLinesAsync(path, header.Select(line => $"# {line}"), cancellation);
+        this.header = header;
+        await Open(cancellation);
         lastTime = Stopwatch.GetElapsedTime(start);
         cpu.Take();
         lastCollections = [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
@@ -119,22 +116,36 @@ internal sealed class StatsRecorder(IFrameStats frames, IProcessCpuSampler cpu, 
         StringBuilder line = new();
         line.Append(CultureInfo.InvariantCulture, $"{DateTime.Now:HH:mm:ss} dt={seconds:F1}s");
         line.Append(CultureInfo.InvariantCulture, $"{(hookFailed ? " painthook=FAILED" : string.Empty)} paints={frame.Paints / seconds:F1}/s");
-        line.Append(CultureInfo.InvariantCulture, $" frame={frame.Width}x{frame.Height} dirty={(frame.Paints == 0 ? 0 : frame.DirtyPixels / (double)frame.Paints / 1e6):F2}Mpx/frame");
+        line.Append(CultureInfo.InvariantCulture, $" frame={frame.Width}x{frame.Height} dirty={(frame.Paints == 0 ? 0 : frame.DirtyPixels / (double)frame.Paints / 1e6):F2}Mpx/frame big={frame.BigPaints / seconds:F1}/s");
         line.Append(CultureInfo.InvariantCulture, $" gaps={frame.Gaps} maxgap={frame.MaxGapMilliseconds:F0}ms paintwait={frame.AverageDelayMilliseconds:F1}/{frame.MaxDelayMilliseconds:F1}ms");
-        line.Append(CultureInfo.InvariantCulture, $" uistall={stall.MaxLateMilliseconds:F0}ms uistalls={stall.Stalls}");
+        line.Append(CultureInfo.InvariantCulture, $" painttick={frame.AverageTickMilliseconds:F1}/{frame.MaxTickMilliseconds:F1}ms uistall={stall.MaxLateMilliseconds:F0}ms uistalls={stall.Stalls}");
 
         foreach ((string kind, long ticks) in usedCpu.OrderBy(pair => pair.Key))
         {
             line.Append(CultureInfo.InvariantCulture, $" cpu.{kind}={ticks / seconds:F0}%");
         }
 
-        line.Append(CultureInfo.InvariantCulture, $" gpu-restarts={cpu.GpuRestarts} gc={collections[0] - lastCollections[0]}/{collections[1] - lastCollections[1]}/{collections[2] - lastCollections[2]} gcpause={(pause - lastPause).TotalMilliseconds:F0}ms alloc={(allocated - lastAllocated) / seconds / 1048576:F1}MB/s ws={Environment.WorkingSet / 1048576}MB page={page()}");
+        line.Append(CultureInfo.InvariantCulture, $" gpu-restarts={cpu.GpuRestarts} gc={collections[0] - lastCollections[0]}/{collections[1] - lastCollections[1]}/{collections[2] - lastCollections[2]} gcpause={(pause - lastPause).TotalMilliseconds:F0}ms alloc={(allocated - lastAllocated) / seconds / 1048576:F1}MB/s ws={Environment.WorkingSet / 1048576}MB");
+        StatsContext around = await context();
+        line.Append(CultureInfo.InvariantCulture, $" active={(around.IsActive ? "yes" : "no")} pointer={around.Pointer} idle={around.PointerIdleSeconds}s screen={around.Screen}");
+
+        if (video.Latest() is { } playing)
+        {
+            line.Append(CultureInfo.InvariantCulture, $" video={playing.PresentedFps:F1}fps dropped={playing.Dropped} vres={playing.Width}x{playing.Height} pagevis={playing.Visibility} pagefocus={(playing.HasFocus ? "yes" : "no")}");
+        }
+
+        line.Append(CultureInfo.InvariantCulture, $" page={around.Page}");
         lastCollections = collections;
         lastPause = pause;
         lastAllocated = allocated;
 
         try
         {
+            if (new FileInfo(path).Length >= maxBytes)
+            {
+                await Open(cancellation);
+            }
+
             await File.AppendAllTextAsync(path, line.AppendLine().ToString(), cancellation);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -144,4 +155,19 @@ internal sealed class StatsRecorder(IFrameStats frames, IProcessCpuSampler cpu, 
 
     private string RequestsPath(string statsPath)
         => Path.Combine(Path.GetDirectoryName(statsPath)!, Path.GetFileName(statsPath).Replace("stats-", "requests-", StringComparison.Ordinal));
+
+    private async Task Open(CancellationToken cancellation)
+    {
+        string suffix = rollovers == 0 ? string.Empty : $"-{rollovers}";
+        path = Path.Combine(folder, $"stats-{DateTime.Now:yyyyMMdd-HHmmss}{suffix}.log");
+        rollovers++;
+
+        foreach (string old in Directory.GetFiles(folder, "stats-*.log").Where(file => file != path).OrderByDescending(file => file).Skip(keep - 1))
+        {
+            File.Delete(old);
+            File.Delete(RequestsPath(old));
+        }
+
+        await File.WriteAllLinesAsync(path, header.Select(line => $"# {line}"), cancellation);
+    }
 }

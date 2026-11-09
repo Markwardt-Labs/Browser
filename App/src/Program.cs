@@ -13,6 +13,8 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        INativeEnvironment environment = new NativeEnvironment();
+        IReadOnlyList<KeyValuePair<string, string>> graphics = new GraphicsEnvironment(OperatingSystem.IsLinux(), environment.Get, environment.Set).DisableSwapSync();
         ICefRuntimeFolder runtime = new CefRuntimeFolder(AppContext.BaseDirectory, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Markwardt.Browser.Runtime"), new CefRuntimeArchive(typeof(Program).Assembly));
 
         IYouTubeAdScript youTube = new YouTubeAdScript();
@@ -45,7 +47,7 @@ internal static class Program
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) => CefRuntime.Shutdown();
 
-        return AppBuilder.Configure(() => new App(instance, profile, settings, launchParser, launch, adBlocker, requestStats))
+        return AppBuilder.Configure(() => new App(instance, profile, settings, launchParser, launch, adBlocker, requestStats, graphics))
             .UsePlatformDetect()
             .AfterPlatformServicesSetup(_ => cef.Start(
                 new CefSettings

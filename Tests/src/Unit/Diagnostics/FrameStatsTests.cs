@@ -6,6 +6,7 @@ namespace Tests.Unit.Diagnostics;
 public sealed class FrameStatsTests
 {
     private readonly List<Action> posted = [];
+    private readonly List<Action> ticked = [];
     private TimeSpan now = TimeSpan.FromSeconds(1);
 
     /// <summary>
@@ -45,6 +46,21 @@ public sealed class FrameStatsTests
     }
 
     /// <summary>
+    /// Frames that change at least a quarter of the window are counted apart from small ones.
+    /// </summary>
+    [Fact]
+    public void Painted_CountsBigPaints()
+    {
+        FrameStats stats = Create(true);
+        stats.Painted(1000, 1000, 250_000);
+        stats.Painted(1000, 1000, 249_999);
+        stats.Painted(1000, 1000, 1_000_000);
+        stats.Painted(1000, 1000, 10);
+
+        Assert.Equal(2, stats.Take(out _).BigPaints);
+    }
+
+    /// <summary>
     /// A frame that comes more than 25 ms after the previous one counts as a gap, but a long pause (nothing was changing) does not.
     /// </summary>
     [Fact]
@@ -74,18 +90,39 @@ public sealed class FrameStatsTests
         FrameStats stats = Create(true);
         stats.Painted(10, 10, 1);
         stats.Painted(10, 10, 1);
-        Assert.Single(posted);
+        Assert.Equal(2, posted.Count);
 
         now += TimeSpan.FromMilliseconds(30);
-        posted[0]();
+        posted[1]();
         stats.Painted(10, 10, 1);
         now += TimeSpan.FromMilliseconds(10);
-        posted[1]();
+        posted[2]();
 
         FrameStatsSnapshot snapshot = stats.Take(out _);
         Assert.Equal(2, snapshot.Delays);
         Assert.Equal(20, snapshot.AverageDelayMilliseconds, 0.5);
         Assert.Equal(30, snapshot.MaxDelayMilliseconds, 0.5);
+    }
+
+    /// <summary>
+    /// How long the window's render loop takes to run after a frame arrives is measured, one measurement at a time.
+    /// </summary>
+    [Fact]
+    public void Painted_MeasuresRenderTick()
+    {
+        FrameStats stats = Create(true);
+        stats.Painted(10, 10, 1);
+        stats.Painted(10, 10, 1);
+        posted.ForEach(action => action());
+        Assert.Single(ticked);
+
+        now += TimeSpan.FromMilliseconds(40);
+        ticked[0]();
+
+        FrameStatsSnapshot snapshot = stats.Take(out _);
+        Assert.Equal(1, snapshot.Ticks);
+        Assert.Equal(40, snapshot.AverageTickMilliseconds, 0.5);
+        Assert.Equal(40, snapshot.MaxTickMilliseconds, 0.5);
     }
 
     /// <summary>
@@ -103,5 +140,5 @@ public sealed class FrameStatsTests
     }
 
     private FrameStats Create(bool enabled)
-        => new(enabled, posted.Add, () => now);
+        => new(enabled, posted.Add, ticked.Add, () => now);
 }

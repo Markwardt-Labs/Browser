@@ -141,10 +141,15 @@ retries. HEVC video does not play either way.
 
 ## Performance log
 
-With `--stats` the browser writes `stats/stats-<date>-<time>.log` in the profile folder (the newest ten are kept):
-comment lines describing the machine, screens and how the window is drawn, then a line every two seconds with
-the frames delivered per second and their size, CPU use of the browser, GPU, renderer and other helper
-processes (100% is one core), how late the UI thread ran, garbage collections, memory and the site being viewed.
+With `--stats` the browser writes `stats/stats-<date>-<time>.log` in the profile folder (the newest ten are kept,
+and a log is closed at 20 MB and a new one started): comment lines describing the machine, screens and how the
+window is drawn, then a line every two seconds with the frames delivered per second and their size, how long the
+window's render loop took to run after a frame arrived (`painttick`), CPU use of the browser, GPU, renderer and
+other helper processes (100% is one core), how late the UI thread ran, garbage collections, memory, whether the
+window has focus (`active`), where the mouse pointer is (`pointer`: over the window, beside it on the same
+screen, or on another screen), how long it has been still (`idle`) and which screen the window is on, how many
+frames a second changed at least a quarter of the window (`big`, which is what a playing video does), how the playing video is doing as the page sees
+it (`video` frames per second shown, `dropped` frames) and the site being viewed.
 The ad blocker's decisions go to `requests-<date>-<time>.log` beside it: what was blocked, which popups were
 refused and which requests to other sites were let through. It records host names only, never full addresses.
 
