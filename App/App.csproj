@@ -27,6 +27,8 @@
     <EmbeddedResource Include="src\Ads\YouTubeAds.js" LogicalName="Markwardt.Browser.Ads.YouTubeAds.js" />
     <EmbeddedResource Include="src\Sites\VideoMode.js" LogicalName="Markwardt.Browser.Sites.VideoMode.js" />
     <EmbeddedResource Include="src\Sites\YouTube.js" LogicalName="Markwardt.Browser.Sites.YouTube.js" />
+    <EmbeddedResource Include="src\Sites\PageState.js" LogicalName="Markwardt.Browser.Sites.PageState.js" />
+    <EmbeddedResource Include="src\Tabs\PageRestore.js" LogicalName="Markwardt.Browser.Tabs.PageRestore.js" />
   </ItemGroup>
 
   <ItemGroup>

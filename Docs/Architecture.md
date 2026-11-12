@@ -140,6 +140,34 @@ tab switches to that tab first). Enter answers OK or Leave, Esc answers Cancel o
 unblocked only by an answer, so every question gets one; a question that stops applying because the page
 moved on is dropped.
 
+## Tabs out of view are cleaned up in tiers
+
+Hidden tabs only stop painting; their renderer, script heap and network activity stay alive, which adds up to
+hundreds of megabytes per page. Tabs that sit unused are therefore handled in steps. After five minutes the
+page is frozen through the DevTools protocol, the way Chromium freezes background tabs itself: it stops
+using CPU and keeps its memory and state, so waking it is instant. After fifteen the CEF browser is disposed
+and only what the tab needs to come back is kept; after a day the tab is closed. The tab's view is a host
+panel that outlives its browser, which keeps the window's bookkeeping unchanged across a suspend, and the
+thumbnail is never discarded (and not replaced by a half loaded page).
+
+Some tabs must not be touched, so a tab can be locked in three ways: by the user, or automatically while its
+page holds something that would be lost. Each page reports on itself through console messages (a script
+installed in every frame by a site rule): whether typed text is still in a field, whether an upload runs, and
+whether media is playing sound. Downloads are known to the browser directly. CEF has no audio state in this
+control, so Web Audio-only pages are not seen as playing. When a lock ends the idle clock restarts, so a tab
+is not closed the moment a day-long upload finishes.
+
+CEF cannot restore a navigation history, so the tab keeps the entries itself. Going back or forward past what
+the new browser knows loads the kept page in place of the current one (`location.replace`), keeping CEF's own
+history at a single entry; the kept pages sit on both sides of it and are consulted first for forward, last
+for back, which keeps the order right when the user also navigated after waking the tab. The scroll position
+and the position of a long video come from the same reports and are replayed once the page has loaded,
+polling for a few seconds until the page is tall enough or the video can seek, and stopping at once if the
+user touches the page. Form contents and other page state are not restored, which is why typing locks the tab.
+
+Downloads needed their own handler: without one CEF drops them, so the browser saves them to the user's
+Downloads folder without a dialog.
+
 ## Several windows share one process
 
 A new window gets its own tab collection, so tabs are separate, and shares the bookmark list and the

@@ -3,7 +3,7 @@ namespace Markwardt.Browser.Bookmarks;
 /// <summary>
 /// Where the bookmarks are kept between runs.
 /// </summary>
-internal interface IBookmarkStorage
+internal interface IBookmarkFile
 {
     /// <summary>
     /// Reads the saved bookmarks.
@@ -25,7 +25,7 @@ internal interface IBookmarkStorage
 /// Keeps the bookmarks in a JSON file.
 /// </summary>
 /// <param name="path">The path of the file.</param>
-internal sealed class BookmarkFile(string path) : IBookmarkStorage
+internal sealed class BookmarkFile(string path) : IBookmarkFile
 {
     /// <inheritdoc />
     public async Task<IReadOnlyList<Bookmark>> Load(CancellationToken cancellation = default)

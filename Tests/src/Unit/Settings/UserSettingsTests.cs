@@ -15,7 +15,7 @@ public sealed class UserSettingsTests
         settings = new UserSettings(storage.Object);
     }
 
-    private readonly Mock<ISettingsStorage> storage = new();
+    private readonly Mock<ISettingsFile> storage = new();
     private readonly UserSettings settings;
 
     /// <summary>

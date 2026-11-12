@@ -15,7 +15,7 @@ internal sealed partial class App(ISingleInstance instance, IProfileFolder profi
 {
     private readonly IAddressResolver addressResolver = new AddressResolver();
     private readonly IShortcutMap shortcutMap = new ShortcutMap();
-    private readonly ISiteRules siteRules = new SiteRules([new VideoModeRule(), new YouTubeRule()]);
+    private readonly ISiteRules siteRules = new SiteRules([new VideoModeRule(), new YouTubeRule(), new PageStateRule()]);
     private readonly IBookmarkList bookmarks = new BookmarkList(new BookmarkFile(Path.Combine(profile.Location, "bookmarks.json")));
     private readonly List<MainWindow> windows = [];
     private readonly IFrameStats frameStats = new FrameStats(launch.Stats, action => Dispatcher.UIThread.Post(action), action => (Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow?.RequestAnimationFrame(_ => action()), () => Stopwatch.GetElapsedTime(0));

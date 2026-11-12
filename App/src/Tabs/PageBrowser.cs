@@ -36,6 +36,7 @@ internal sealed class PageBrowser : AvaloniaCefBrowser
     private readonly BrowserTooltips tooltips;
     private readonly IFrameStats frameStats;
     private string hoveredLink = string.Empty;
+    private int devToolsMessage;
     private bool swallowingClick;
     private Point tooltipOrigin;
     private Point lastPosition;
@@ -97,6 +98,29 @@ internal sealed class PageBrowser : AvaloniaCefBrowser
     /// </summary>
     public void ReleaseFocus()
         => UnderlyingBrowser?.GetHost().SetFocus(false);
+
+    /// <summary>
+    /// Freezes the page, which stops its scripts, timers and network callbacks while it keeps its memory and state, or lets it run again. Done through the DevTools protocol, which is how Chromium itself freezes background tabs.
+    /// </summary>
+    /// <param name="frozen">Whether to freeze the page rather than resume it.</param>
+    public void SetFrozen(bool frozen)
+    {
+        if (UnderlyingBrowser?.GetHost() is not { } host)
+        {
+            return;
+        }
+
+        CefDictionaryValue parameters = CefDictionaryValue.Create();
+        parameters.SetString("state", frozen ? "frozen" : "active");
+        host.ExecuteDevToolsMethod(++devToolsMessage, "Page.setWebLifecycleState", parameters);
+    }
+
+    /// <summary>
+    /// Reads the browser's own back and forward history.
+    /// </summary>
+    /// <param name="done">Called, on a CEF thread, with every entry, oldest first, and the index of the current one.</param>
+    public void ReadHistory(Action<IReadOnlyList<HistoryEntry>, int> done)
+        => UnderlyingBrowser?.GetHost().GetNavigationEntries(new BrowserHistory(done), false);
 
     /// <summary>
     /// Searches the page and highlights the matches; results arrive through <see cref="FindResult"/>.

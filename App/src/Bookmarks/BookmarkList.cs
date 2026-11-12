@@ -55,7 +55,7 @@ internal interface IBookmarkList
 
 /// <inheritdoc cref="IBookmarkList" />
 /// <param name="storage">Reads and writes the saved bookmarks.</param>
-internal sealed class BookmarkList(IBookmarkStorage storage) : IBookmarkList
+internal sealed class BookmarkList(IBookmarkFile storage) : IBookmarkList
 {
     private readonly SemaphoreSlim saving = new(1, 1);
 

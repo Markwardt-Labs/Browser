@@ -92,13 +92,16 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="tabs:IBrowserTab">
-                <Border Classes="card" Classes.on="{Binding IsActive}" PointerPressed="OnCardPointerPressed">
+                <Border Classes="card" Classes.on="{Binding IsActive}" Classes.suspended="{Binding IsSuspended}" Classes.frozen="{Binding IsFrozen}" PointerPressed="OnCardPointerPressed">
                   <Grid RowDefinitions="*,Auto">
                     <Image Grid.Row="0" Source="{Binding Thumbnail}" Stretch="Uniform" VerticalAlignment="Top" IsHitTestVisible="False" />
                     <Border Grid.Row="1" Background="{DynamicResource Elevated}" CornerRadius="0,0,8,8" Padding="12,0,4,0" Height="36">
-                      <Grid ColumnDefinitions="*,Auto">
+                      <Grid ColumnDefinitions="*,Auto,Auto">
                         <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" Classes="icon" ToolTip.Tip="Close tab" Click="OnCloseTabClick">
+                        <Button Grid.Column="1" Classes="icon lock" Classes.on="{Binding IsLocked}" Classes.auto="{Binding IsAutoLocked}" ToolTip.Tip="{Binding LockDescription}" Click="OnLockTabClick">
+                          <Path Classes="lineIcon" Data="{StaticResource LockIconGeometry}" Width="14" Height="14" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="icon" ToolTip.Tip="Close tab" Click="OnCloseTabClick">
                           <Path Classes="lineIcon" Data="{StaticResource CloseIconGeometry}" Width="10" Height="10" />
                         </Button>
                       </Grid>

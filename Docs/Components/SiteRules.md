@@ -42,3 +42,13 @@ from the player's own video id, it:
 
 Each step is tried a limited number of times and never repeated for the same video, so the viewer's
 own change of quality, theater mode or video mode is not undone. Leaving the watch page ends video mode.
+
+## Page state
+
+`PageStateRule` matches every web and file frame. Its script reports to the browser through the console what
+the tab's lock and restore need: typed text still in a field, an upload (a `fetch` or `XMLHttpRequest` with a
+file or large body, or a form with a file chosen), media that is playing unmuted, and, for the top frame, the
+scroll position and the position of the longest video or audio. Reports are sent only when something changes,
+with the video position at most every five seconds and at once on pause or seek, so a quiet page sends none.
+A report from a frame the page itself spoofs only affects that tab.
+

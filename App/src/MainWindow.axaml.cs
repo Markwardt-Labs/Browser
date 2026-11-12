@@ -34,6 +34,8 @@ public sealed partial class MainWindow : Window
         settings.PropertyChanged += OnSettingsChanged;
         FindBox.PropertyChanged += OnFindBoxPropertyChanged;
         tabs.PropertyChanged += OnTabsPropertyChanged;
+        suspendTimer.Tick += (_, _) => tabs.Cleanup(cleanup);
+        suspendTimer.Start();
         BookmarkItems.ItemsSource = bookmarks.Items;
         bookmarks.Items.CollectionChanged += OnBookmarksChanged;
         UpdateBookmarks();
@@ -79,6 +81,8 @@ public sealed partial class MainWindow : Window
     private readonly IUserSettings settings;
     private readonly LaunchOptions launch;
     private readonly Action newWindow;
+    private readonly DispatcherTimer suspendTimer = new() { Interval = TimeSpan.FromSeconds(30) };
+    private readonly TabCleanupPolicy cleanup = new() { FreezeAfter = TimeSpan.FromMinutes(5), SuspendAfter = TimeSpan.FromMinutes(15), CloseAfter = TimeSpan.FromHours(24) };
     private bool showingAddress;
     private bool matchCase;
     private IBrowserTab? findTab;
@@ -101,6 +105,7 @@ public sealed partial class MainWindow : Window
     /// <inheritdoc />
     protected override void OnClosed(EventArgs e)
     {
+        suspendTimer.Stop();
         bookmarks.Items.CollectionChanged -= OnBookmarksChanged;
         settings.PropertyChanged -= OnSettingsChanged;
         base.OnClosed(e);
@@ -776,6 +781,16 @@ public sealed partial class MainWindow : Window
         if ((sender as Control)?.DataContext is Bookmark bookmark)
         {
             bookmarks.Remove(bookmark);
+        }
+
+        e.Handled = true;
+    }
+
+    private void OnLockTabClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is IBrowserTab tab)
+        {
+            tab.IsLocked = !tab.IsLocked;
         }
 
         e.Handled = true;

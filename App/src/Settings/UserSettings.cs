@@ -20,7 +20,7 @@ internal interface IUserSettings : INotifyPropertyChanged
 
 /// <inheritdoc cref="IUserSettings" />
 /// <param name="storage">Where the choices are kept.</param>
-internal sealed class UserSettings(ISettingsStorage storage) : ObservableObject, IUserSettings
+internal sealed class UserSettings(ISettingsFile storage) : ObservableObject, IUserSettings
 {
     private readonly SemaphoreSlim saving = new(1, 1);
     private bool topBarVisible = true;

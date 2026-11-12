@@ -74,6 +74,24 @@ shows which one is active out of how many. Enter (or the down arrow) goes to the
 (or the up arrow) to the previous one, Aa makes the search case sensitive, and Esc or the cross closes
 it. The box goes away on its own when you open the overview or switch tabs.
 
+## Tabs you are not using
+
+A tab that has been out of view is cleaned up in steps: after 5 minutes it is frozen (it stops running but
+keeps everything it had and wakes instantly), after 15 minutes it is suspended (its page is released to free
+memory, and its card in the overview is dimmed), and after 24 hours it is closed. Opening a frozen or
+suspended tab wakes it. A suspended tab loads its address again but keeps its back and forward history, how
+far the page was scrolled, and where a long video or audio had got to (paused); form contents and other
+page state are lost. The card keeps its picture throughout.
+
+The lock button on a card (shown on hover) has three states. Unlocked: nothing protects the tab. Locked
+automatically: shown while the page has text you typed into a field, a download or upload is running, or it
+is playing sound; it ends by itself when that stops, and the tab's wait starts over. Locked: you clicked it,
+and the tab is never frozen, suspended or closed until you click again. Hover the button to see which it is
+and why.
+
+Downloads are saved to your Downloads folder without asking, with a number added to the name if the file
+exists.
+
 ## Questions from pages
 
 When a page asks something (an alert, a confirm or prompt, or "leave this page?" when going back,

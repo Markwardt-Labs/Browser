@@ -26,6 +26,41 @@ internal interface IBrowserTab : INotifyPropertyChanged
     string Title { get; }
 
     /// <summary>
+    /// Gets a value indicating whether the page is frozen: it keeps its memory and state but runs nothing, and carries on when the tab is shown.
+    /// </summary>
+    bool IsFrozen { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the page has been released to free its resources. A suspended tab keeps its address, title, picture, history and where the page was scrolled to, and loads its address again when it is shown.
+    /// </summary>
+    bool IsSuspended { get; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the user locked the tab, which protects it from automatic cleanup until they unlock it.
+    /// </summary>
+    bool IsLocked { get; set; }
+
+    /// <summary>
+    /// Gets whether the tab is protected from automatic cleanup: by the user (<see cref="TabLock.Locked"/>), or for as long as the page is doing something that would be lost (<see cref="TabLock.AutoLocked"/>).
+    /// </summary>
+    TabLock Lock { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <see cref="Lock"/> is <see cref="TabLock.AutoLocked"/>.
+    /// </summary>
+    bool IsAutoLocked { get; }
+
+    /// <summary>
+    /// Gets a sentence that says what the lock is and, when automatic, why.
+    /// </summary>
+    string LockDescription { get; }
+
+    /// <summary>
+    /// Gets how long the tab has been out of view, or zero while it is shown.
+    /// </summary>
+    TimeSpan IdleFor { get; }
+
+    /// <summary>
     /// Gets the question the page is blocked on until the user answers it, or null.
     /// </summary>
     IPageDialog? Dialog { get; }
@@ -101,6 +136,16 @@ internal interface IBrowserTab : INotifyPropertyChanged
     void ToggleVideoMode();
 
     /// <summary>
+    /// Freezes the page so it stops using CPU. Does nothing for a shown tab, or one that is suspended or already frozen.
+    /// </summary>
+    void Freeze();
+
+    /// <summary>
+    /// Releases the page so it stops using CPU, GPU and memory. Does nothing for a shown tab or one that is already suspended.
+    /// </summary>
+    void Suspend();
+
+    /// <summary>
     /// Updates <see cref="Thumbnail"/> from what the page is showing now.
     /// </summary>
     void CaptureThumbnail();
@@ -150,6 +195,28 @@ internal interface IBrowserTab : INotifyPropertyChanged
 /// <inheritdoc cref="IBrowserTab" />
 internal sealed class BrowserTab : ObservableObject, IBrowserTab
 {
+    private static string Describe(AutoLockReason reasons)
+    {
+        List<string> parts = [];
+
+        if (reasons.HasFlag(AutoLockReason.Typing))
+        {
+            parts.Add("you typed into a field");
+        }
+
+        if (reasons.HasFlag(AutoLockReason.Transfer))
+        {
+            parts.Add("a download or upload is running");
+        }
+
+        if (reasons.HasFlag(AutoLockReason.Sound))
+        {
+            parts.Add("it is playing sound");
+        }
+
+        return string.Join(" and ", parts);
+    }
+
     /// <summary>
     /// Creates a tab and starts loading an address.
     /// </summary>
@@ -161,50 +228,43 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
     /// <param name="videoStats">Collects what the page reports about its playing video, when diagnostics are on.</param>
     public BrowserTab(string address, IShortcutMap shortcuts, ISiteRules siteRules, IAdBlocker adBlocker, IFrameStats frameStats, IVideoStats videoStats)
     {
+        this.shortcuts = shortcuts;
+        this.siteRules = siteRules;
+        this.frameStats = frameStats;
         this.videoStats = videoStats;
-        browser = new PageBrowser(frameStats);
         this.address = address;
         this.adBlocker = adBlocker;
-        browser.IsVisible = false;
-        browser.Settings.BackgroundColor = new CefColor(255, 30, 30, 30);
-        browser.Settings.WindowlessFrameRate = 60;
-        browser.ContextMenuHandler = new BrowserContextMenu(browser, Open);
-        browser.LinkOpenRequested += Open;
-        browser.JSDialogHandler = new BrowserDialogs(question => Dispatcher.UIThread.Post(() => Dialog = question), () => Dispatcher.UIThread.Post(() => Dialog = null));
-        browser.FindResult += (count, active) => Dispatcher.UIThread.Post(() => FindResultChanged?.Invoke(count, active));
-        browser.LifeSpanHandler = new BrowserPopups(adBlocker, (url, background) => Dispatcher.UIThread.Post(() => Open(url, background ? LinkTarget.BackgroundTab : LinkTarget.Current)));
-        browser.LoadingStateChange += (_, state) => Dispatcher.UIThread.Post(() =>
-        {
-            CanGoBack = state.CanGoBack;
-            CanGoForward = state.CanGoForward;
-        });
-        browser.KeyboardHandler = new BrowserKeys(shortcuts, command => Dispatcher.UIThread.Post(() => ShortcutPressed?.Invoke(command)));
-        browser.Address = address;
-        browser.RequestHandler = new BrowserRequests(adBlocker);
-
-        if (videoStats.Script is not null)
-        {
-            browser.ConsoleMessage += (_, console) => videoStats.Note(console.Source ?? string.Empty, console.Message ?? string.Empty);
-        }
-
-        browser.LoadStart += (_, started) => HideAds(started.Frame);
-        browser.LoadEnd += (_, loaded) =>
-        {
-            string frameAddress = loaded.Frame.Url ?? string.Empty;
-            HideAds(loaded.Frame);
-
-            foreach (string script in siteRules.Scripts(frameAddress))
-            {
-                loaded.Frame.ExecuteJavaScript(script, frameAddress, 0);
-            }
-        };
-        browser.AddressChanged += (_, value) => Dispatcher.UIThread.Post(() => Address = value ?? string.Empty);
-        browser.TitleChanged += (_, value) => Dispatcher.UIThread.Post(() => Title = value is null or "about:blank" ? string.Empty : value);
+        host.IsVisible = false;
+        browser = CreateBrowser(address);
     }
 
-    private readonly PageBrowser browser;
+    private readonly Panel host = new();
+    private readonly IShortcutMap shortcuts;
+    private readonly ISiteRules siteRules;
     private readonly IAdBlocker adBlocker;
+    private readonly IFrameStats frameStats;
     private readonly IVideoStats videoStats;
+    private readonly IPageRestore pageRestore = new PageRestore();
+    private readonly IAutoLock autoLock = new AutoLock();
+    private readonly IVirtualHistory history = new VirtualHistory();
+    private readonly string downloadFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+    private PageBrowser? browser;
+    private long hiddenSince = Stopwatch.GetTimestamp();
+    private bool isFrozen;
+    private bool isSuspended;
+    private bool isLocked;
+    private TabLock lastLock;
+    private bool hasLoaded;
+    private bool resuming;
+    private string? pendingRestore;
+    private PageReport? lastTop;
+    private IReadOnlyList<HistoryEntry> nativeEntries = [];
+    private int nativeIndex = -1;
+    private int nativeTotal = -1;
+    private bool nativeCanGoBack;
+    private bool nativeCanGoForward;
+    private IReadOnlyList<HistoryEntry>? savedEntries;
+    private int savedIndex = -1;
     private string title = string.Empty;
     private string address;
     private IPageDialog? dialog;
@@ -228,6 +288,63 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
         get => title;
         private set => Set(ref title, value);
     }
+
+    /// <inheritdoc />
+    public bool IsFrozen
+    {
+        get => isFrozen;
+        private set => Set(ref isFrozen, value);
+    }
+
+    /// <inheritdoc />
+    public bool IsSuspended
+    {
+        get => isSuspended;
+        private set => Set(ref isSuspended, value);
+    }
+
+    /// <inheritdoc />
+    public bool IsLocked
+    {
+        get => isLocked;
+        set
+        {
+            if (isLocked == value)
+            {
+                return;
+            }
+
+            isLocked = value;
+            Raise(nameof(IsLocked));
+
+            if (value)
+            {
+                Unfreeze();
+            }
+
+            RefreshLock();
+        }
+    }
+
+    /// <inheritdoc />
+    public TabLock Lock
+        => isLocked ? TabLock.Locked : autoLock.Reasons != AutoLockReason.None ? TabLock.AutoLocked : TabLock.Unlocked;
+
+    /// <inheritdoc />
+    public bool IsAutoLocked => Lock == TabLock.AutoLocked;
+
+    /// <inheritdoc />
+    public string LockDescription
+        => Lock switch
+        {
+            TabLock.Locked => "Locked: this tab is never frozen, suspended or closed. Click to unlock it.",
+            TabLock.AutoLocked => $"Locked for now because {Describe(autoLock.Reasons)}. Click to lock it until you unlock it.",
+            _ => "Lock this tab so it is never frozen, suspended or closed.",
+        };
+
+    /// <inheritdoc />
+    public TimeSpan IdleFor
+        => isActive ? TimeSpan.Zero : Stopwatch.GetElapsedTime(hiddenSince);
 
     /// <inheritdoc />
     public IPageDialog? Dialog
@@ -269,47 +386,168 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
             if (isActive && !value)
             {
                 CaptureThumbnail();
+                hiddenSince = Stopwatch.GetTimestamp();
+            }
+
+            if (value)
+            {
+                Resume();
+                Unfreeze();
             }
 
             Set(ref isActive, value);
-            browser.IsVisible = value;
+            host.IsVisible = value;
+
+            if (browser is not null)
+            {
+                browser.IsVisible = value;
+            }
         }
     }
 
     /// <inheritdoc />
-    public Control View => browser;
+    public Control View => host;
 
     /// <inheritdoc />
     public void Navigate(string address)
-        => browser.Address = address;
+    {
+        if (browser is null)
+        {
+            savedEntries = [.. savedEntries?.Take(savedIndex + 1) ?? [], new HistoryEntry(address, string.Empty)];
+            savedIndex = savedEntries.Count - 1;
+            lastTop = null;
+            Address = address;
+            Resume();
+            return;
+        }
+
+        Unfreeze();
+        browser.Address = address;
+    }
 
     /// <inheritdoc />
     public void GoBack()
-        => browser.GoBack();
+    {
+        if (browser is null)
+        {
+            return;
+        }
+
+        Unfreeze();
+
+        switch (history.Back(nativeCanGoBack, new HistoryEntry(address, title), out HistoryEntry? entry))
+        {
+            case HistoryMove.Native:
+                browser.GoBack();
+                break;
+            case HistoryMove.Restored when entry is not null:
+                Restore(entry);
+                break;
+        }
+
+        UpdateHistoryFlags();
+    }
 
     /// <inheritdoc />
     public void GoForward()
-        => browser.GoForward();
+    {
+        if (browser is null)
+        {
+            return;
+        }
+
+        Unfreeze();
+
+        switch (history.Forward(nativeCanGoForward, new HistoryEntry(address, title), out HistoryEntry? entry))
+        {
+            case HistoryMove.Native:
+                browser.GoForward();
+                break;
+            case HistoryMove.Restored when entry is not null:
+                Restore(entry);
+                break;
+        }
+
+        UpdateHistoryFlags();
+    }
 
     /// <inheritdoc />
     public void Reload()
-        => browser.Reload(false);
+    {
+        if (browser is null)
+        {
+            Resume();
+            return;
+        }
+
+        Unfreeze();
+        browser.Reload(false);
+    }
 
     /// <inheritdoc />
     public void Find(string text, bool forward, bool matchCase, bool continuing)
-        => browser.Find(text, forward, matchCase, continuing);
+        => browser?.Find(text, forward, matchCase, continuing);
 
     /// <inheritdoc />
     public void StopFinding()
-        => browser.StopFinding();
+        => browser?.StopFinding();
 
     /// <inheritdoc />
     public void ToggleVideoMode()
-        => browser.ExecuteJavaScript("window.__markwardtVideoMode?.toggleAll();", "about:blank", 0);
+        => browser?.ExecuteJavaScript("window.__markwardtVideoMode?.toggleAll();", "about:blank", 0);
+
+    /// <inheritdoc />
+    public void Freeze()
+    {
+        if (isActive || browser is null || isFrozen || isSuspended)
+        {
+            return;
+        }
+
+        browser.SetFrozen(true);
+        IsFrozen = true;
+    }
+
+    /// <inheritdoc />
+    public void Suspend()
+    {
+        if (isActive || browser is null)
+        {
+            return;
+        }
+
+        if (nativeEntries.Count > 0)
+        {
+            savedEntries = history.Compose(nativeEntries, nativeIndex, out int index);
+            savedIndex = index;
+        }
+
+        PageBrowser released = browser;
+        browser = null;
+        host.Children.Remove(released);
+        released.Dispose();
+        nativeEntries = [];
+        nativeIndex = -1;
+        nativeTotal = -1;
+        nativeCanGoBack = false;
+        nativeCanGoForward = false;
+        Dialog = null;
+        CanGoBack = false;
+        CanGoForward = false;
+        IsFrozen = false;
+        IsSuspended = true;
+        autoLock.Reset();
+        RefreshLock();
+    }
 
     /// <inheritdoc />
     public void CaptureThumbnail()
     {
+        if (browser is null || !hasLoaded)
+        {
+            return;
+        }
+
         PixelSize size = new((int)browser.Bounds.Width, (int)browser.Bounds.Height);
 
         if (size.Width <= 0 || size.Height <= 0)
@@ -327,18 +565,250 @@ internal sealed class BrowserTab : ObservableObject, IBrowserTab
 
     /// <inheritdoc />
     public void Focus()
-        => browser.Focus();
+        => browser?.Focus();
 
     /// <inheritdoc />
     public void ReleaseFocus()
-        => browser.ReleaseFocus();
+        => browser?.ReleaseFocus();
 
     /// <inheritdoc />
     public void Close()
     {
         dialog = null;
-        browser.Dispose();
+        browser?.Dispose();
+        browser = null;
         thumbnail?.Dispose();
+    }
+
+    private PageBrowser CreateBrowser(string startAddress)
+    {
+        PageBrowser created = new(frameStats)
+        {
+            IsVisible = false,
+            Address = startAddress,
+        };
+
+        hasLoaded = false;
+        created.Settings.BackgroundColor = new CefColor(255, 30, 30, 30);
+        created.Settings.WindowlessFrameRate = 60;
+        created.ContextMenuHandler = new BrowserContextMenu(created, Open);
+        created.LinkOpenRequested += Open;
+        created.JSDialogHandler = new BrowserDialogs(question => Dispatcher.UIThread.Post(() => Dialog = question), () => Dispatcher.UIThread.Post(() => Dialog = null));
+        created.DownloadHandler = new BrowserDownloads(downloadFolder, (id, inProgress) => Dispatcher.UIThread.Post(() =>
+        {
+            if (autoLock.Download(id, inProgress))
+            {
+                RefreshLock();
+            }
+        }));
+        created.FindResult += (count, active) => Dispatcher.UIThread.Post(() => FindResultChanged?.Invoke(count, active));
+        created.LifeSpanHandler = new BrowserPopups(adBlocker, (url, background) => Dispatcher.UIThread.Post(() => Open(url, background ? LinkTarget.BackgroundTab : LinkTarget.Current)));
+        created.LoadingStateChange += (_, state) =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (!ReferenceEquals(browser, created))
+                {
+                    return;
+                }
+
+                nativeCanGoBack = state.CanGoBack;
+                nativeCanGoForward = state.CanGoForward;
+                UpdateHistoryFlags();
+            });
+
+            if (!state.IsLoading)
+            {
+                created.ReadHistory((entries, index) => Dispatcher.UIThread.Post(() => TakeHistory(created, entries, index)));
+            }
+        };
+        created.KeyboardHandler = new BrowserKeys(shortcuts, command => Dispatcher.UIThread.Post(() => ShortcutPressed?.Invoke(command)));
+        created.RequestHandler = new BrowserRequests(adBlocker);
+        created.ConsoleMessage += (_, console) =>
+        {
+            string message = console.Message ?? string.Empty;
+
+            if (PageReport.TryParse(message, out PageReport report))
+            {
+                Dispatcher.UIThread.Post(() => TakeReport(created, report));
+            }
+            else if (videoStats.Script is not null)
+            {
+                videoStats.Note(console.Source ?? string.Empty, message);
+            }
+        };
+        created.LoadStart += (_, started) =>
+        {
+            HideAds(started.Frame);
+
+            if (started.Frame.IsMain)
+            {
+                Dispatcher.UIThread.Post(() => TakeNavigation(created));
+            }
+        };
+        created.LoadEnd += (_, loaded) =>
+        {
+            string frameAddress = loaded.Frame.Url ?? string.Empty;
+            HideAds(loaded.Frame);
+
+            foreach (string script in siteRules.Scripts(frameAddress))
+            {
+                loaded.Frame.ExecuteJavaScript(script, frameAddress, 0);
+            }
+
+            if (loaded.Frame.IsMain)
+            {
+                Dispatcher.UIThread.Post(() => TakeLoaded(created));
+            }
+        };
+        created.AddressChanged += (_, value) => Dispatcher.UIThread.Post(() =>
+        {
+            if (ReferenceEquals(browser, created))
+            {
+                Address = value ?? string.Empty;
+            }
+        });
+        created.TitleChanged += (_, value) => Dispatcher.UIThread.Post(() =>
+        {
+            if (ReferenceEquals(browser, created))
+            {
+                Title = value is null or "about:blank" ? string.Empty : value;
+            }
+        });
+        host.Children.Add(created);
+        return created;
+    }
+
+    private void Resume()
+    {
+        if (browser is not null)
+        {
+            return;
+        }
+
+        hiddenSince = Stopwatch.GetTimestamp();
+        string start = address;
+
+        if (savedEntries is not null && savedIndex >= 0 && savedIndex < savedEntries.Count)
+        {
+            history.Load(savedEntries, savedIndex);
+            start = savedEntries[savedIndex].Url;
+        }
+
+        pendingRestore = lastTop is null ? null : pageRestore.Script(lastTop);
+        resuming = true;
+        browser = CreateBrowser(start);
+        IsSuspended = false;
+        UpdateHistoryFlags();
+    }
+
+    private void Unfreeze()
+    {
+        if (!isFrozen)
+        {
+            return;
+        }
+
+        browser?.SetFrozen(false);
+        IsFrozen = false;
+    }
+
+    private void RefreshLock()
+    {
+        TabLock now = Lock;
+
+        if (now == TabLock.Unlocked && lastLock != TabLock.Unlocked && !isActive)
+        {
+            hiddenSince = Stopwatch.GetTimestamp();
+        }
+
+        lastLock = now;
+        Raise(nameof(Lock));
+        Raise(nameof(IsAutoLocked));
+        Raise(nameof(LockDescription));
+    }
+
+    private void UpdateHistoryFlags()
+    {
+        CanGoBack = history.CanGoBack(nativeCanGoBack);
+        CanGoForward = history.CanGoForward(nativeCanGoForward);
+    }
+
+    private void Restore(HistoryEntry entry)
+    {
+        lastTop = null;
+        browser?.ExecuteJavaScript($"location.replace({JsonSerializer.Serialize(entry.Url)});", "about:blank", 0);
+    }
+
+    private void TakeHistory(PageBrowser source, IReadOnlyList<HistoryEntry> entries, int index)
+    {
+        if (!ReferenceEquals(browser, source))
+        {
+            return;
+        }
+
+        if (nativeTotal >= 0 && entries.Count > nativeTotal)
+        {
+            history.ClearForward();
+        }
+
+        nativeEntries = entries;
+        nativeIndex = index;
+        nativeTotal = entries.Count;
+        UpdateHistoryFlags();
+    }
+
+    private void TakeReport(PageBrowser source, PageReport report)
+    {
+        if (!ReferenceEquals(browser, source))
+        {
+            return;
+        }
+
+        if (report.IsTop)
+        {
+            lastTop = report;
+        }
+
+        if (autoLock.Apply(report))
+        {
+            RefreshLock();
+        }
+    }
+
+    private void TakeNavigation(PageBrowser source)
+    {
+        if (!ReferenceEquals(browser, source))
+        {
+            return;
+        }
+
+        if (!resuming)
+        {
+            lastTop = null;
+        }
+
+        if (autoLock.Reset())
+        {
+            RefreshLock();
+        }
+    }
+
+    private void TakeLoaded(PageBrowser source)
+    {
+        if (!ReferenceEquals(browser, source))
+        {
+            return;
+        }
+
+        hasLoaded = true;
+        resuming = false;
+
+        if (pendingRestore is { } script)
+        {
+            pendingRestore = null;
+            source.ExecuteJavaScript(script, "about:blank", 0);
+        }
     }
 
     private void HideAds(CefFrame frame)

@@ -25,6 +25,7 @@ public sealed class BrowserTabsTests
     private readonly Mock<IBrowserTab.IFactory> factory = new();
     private readonly List<Mock<IBrowserTab>> created = [];
     private readonly BrowserTabs tabs;
+    private readonly TabCleanupPolicy policy = new() { FreezeAfter = TimeSpan.FromMinutes(5), SuspendAfter = TimeSpan.FromMinutes(15), CloseAfter = TimeSpan.FromHours(24) };
 
     /// <summary>
     /// Opening a tab adds it and makes it the active one.
@@ -249,5 +250,135 @@ public sealed class BrowserTabsTests
         created[0].Raise(t => t.ShortcutPressed += null, ShortcutCommand.NewTab);
 
         Assert.Equal([ShortcutCommand.NewTab], received);
+    }
+
+    private Mock<IBrowserTab> OpenIdle(TimeSpan idle, TabLock lockState = TabLock.Unlocked)
+    {
+        tabs.Open($"https://idle{created.Count}.example");
+        Mock<IBrowserTab> mock = created[^1];
+        mock.Setup(t => t.IdleFor).Returns(idle);
+        mock.Setup(t => t.Lock).Returns(lockState);
+        tabs.Open($"https://shown{created.Count}.example");
+        return mock;
+    }
+
+    /// <summary>
+    /// A tab that has only been out of view briefly is left running.
+    /// </summary>
+    [Fact]
+    public void Cleanup_RecentTab_IsLeftAlone()
+    {
+        Mock<IBrowserTab> idle = OpenIdle(TimeSpan.FromMinutes(4));
+
+        tabs.Cleanup(policy);
+
+        idle.Verify(t => t.Freeze(), Times.Never);
+        idle.Verify(t => t.Suspend(), Times.Never);
+    }
+
+    /// <summary>
+    /// After the first wait a tab is frozen, not yet suspended.
+    /// </summary>
+    [Fact]
+    public void Cleanup_PastFreezeTime_Freezes()
+    {
+        Mock<IBrowserTab> idle = OpenIdle(TimeSpan.FromMinutes(6));
+
+        tabs.Cleanup(policy);
+
+        idle.Verify(t => t.Freeze(), Times.Once);
+        idle.Verify(t => t.Suspend(), Times.Never);
+    }
+
+    /// <summary>
+    /// A tab that is already frozen is not frozen again.
+    /// </summary>
+    [Fact]
+    public void Cleanup_AlreadyFrozen_IsNotFrozenAgain()
+    {
+        Mock<IBrowserTab> idle = OpenIdle(TimeSpan.FromMinutes(6));
+        idle.Setup(t => t.IsFrozen).Returns(true);
+
+        tabs.Cleanup(policy);
+
+        idle.Verify(t => t.Freeze(), Times.Never);
+    }
+
+    /// <summary>
+    /// After the second wait a tab is suspended.
+    /// </summary>
+    [Fact]
+    public void Cleanup_PastSuspendTime_Suspends()
+    {
+        Mock<IBrowserTab> idle = OpenIdle(TimeSpan.FromMinutes(16));
+
+        tabs.Cleanup(policy);
+
+        idle.Verify(t => t.Suspend(), Times.Once);
+        idle.Verify(t => t.Freeze(), Times.Never);
+    }
+
+    /// <summary>
+    /// A tab that is already suspended is not suspended or frozen again.
+    /// </summary>
+    [Fact]
+    public void Cleanup_AlreadySuspended_IsSkipped()
+    {
+        Mock<IBrowserTab> idle = OpenIdle(TimeSpan.FromHours(3));
+        idle.Setup(t => t.IsSuspended).Returns(true);
+
+        tabs.Cleanup(policy);
+
+        idle.Verify(t => t.Suspend(), Times.Never);
+        idle.Verify(t => t.Freeze(), Times.Never);
+    }
+
+    /// <summary>
+    /// After the last wait a tab is closed.
+    /// </summary>
+    [Fact]
+    public void Cleanup_PastCloseTime_ClosesTheTab()
+    {
+        Mock<IBrowserTab> idle = OpenIdle(TimeSpan.FromHours(25));
+
+        tabs.Cleanup(policy);
+
+        Assert.DoesNotContain(idle.Object, tabs.Items);
+        idle.Verify(t => t.Close(), Times.Once);
+    }
+
+    /// <summary>
+    /// A tab locked by the user, or locked automatically, is never touched however long it sits.
+    /// </summary>
+    /// <param name="byUser">Whether the user locked it, rather than the page locking it automatically.</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Cleanup_LockedTab_IsLeftAlone(bool byUser)
+    {
+        Mock<IBrowserTab> idle = OpenIdle(TimeSpan.FromHours(30), byUser ? TabLock.Locked : TabLock.AutoLocked);
+
+        tabs.Cleanup(policy);
+
+        Assert.Contains(idle.Object, tabs.Items);
+        idle.Verify(t => t.Freeze(), Times.Never);
+        idle.Verify(t => t.Suspend(), Times.Never);
+        idle.Verify(t => t.Close(), Times.Never);
+    }
+
+    /// <summary>
+    /// The shown tab is never cleaned up, however long its clock says.
+    /// </summary>
+    [Fact]
+    public void Cleanup_ShownTab_IsLeftAlone()
+    {
+        IBrowserTab shown = tabs.Open("https://shown.example");
+        created[0].Setup(t => t.IdleFor).Returns(TimeSpan.FromHours(30));
+
+        tabs.Cleanup(policy);
+
+        Assert.Same(shown, tabs.Active);
+        created[0].Verify(t => t.Close(), Times.Never);
+        created[0].Verify(t => t.Suspend(), Times.Never);
     }
 }

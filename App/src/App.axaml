@@ -189,6 +189,24 @@
     <Style Selector="Border.card:pointerover Button.icon">
       <Setter Property="Opacity" Value="1" />
     </Style>
+    <Style Selector="Border.card Button.lock.on">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Border.card Button.lock.auto">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Border.card Button.lock.auto Path.lineIcon">
+      <Setter Property="Stroke" Value="{DynamicResource Text}" />
+    </Style>
+    <Style Selector="Border.card Button.lock.on Path.lineIcon">
+      <Setter Property="Stroke" Value="{DynamicResource Accent}" />
+    </Style>
+    <Style Selector="Border.card.frozen">
+      <Setter Property="Opacity" Value="0.8" />
+    </Style>
+    <Style Selector="Border.card.suspended">
+      <Setter Property="Opacity" Value="0.55" />
+    </Style>
 
     <Style Selector="Border.edge">
       <Setter Property="Background" Value="Transparent" />
@@ -226,6 +244,7 @@
       <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="#CCCCCC" />
       <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver" Color="White" />
       <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed" Color="White" />
+      <Geometry x:Key="LockIconGeometry">M3.5,6.5 L10.5,6.5 L10.5,12 L3.5,12 Z M5,6.5 L5,4.6 A2,2 0 0 1 9,4.6 L9,6.5</Geometry>
       <Geometry x:Key="StarIconGeometry">M7,1 L8.9,5.1 L13.4,5.6 L10,8.7 L10.9,13.1 L7,10.9 L3.1,13.1 L4,8.7 L0.6,5.6 L5.1,5.1 Z</Geometry>
       <Geometry x:Key="PlusIconGeometry">M7,2 L7,12 M2,7 L12,7</Geometry>
       <Geometry x:Key="PencilIconGeometry">M2,12 L2.7,9 L9.5,2.2 A1.4,1.4 0 0 1 11.8,4.5 L5,11.3 Z M8.2,3.6 L10.4,5.8</Geometry>

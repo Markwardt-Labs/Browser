@@ -17,7 +17,7 @@ public sealed class BookmarkListTests
         list = new BookmarkList(storage.Object);
     }
 
-    private readonly Mock<IBookmarkStorage> storage = new();
+    private readonly Mock<IBookmarkFile> storage = new();
     private readonly List<IReadOnlyList<Bookmark>> saves = [];
     private readonly BookmarkList list;
 

@@ -34,6 +34,12 @@ internal interface IBrowserTabs : INotifyPropertyChanged
     void CloseAll();
 
     /// <summary>
+    /// Cleans up the tabs that sit out of view: freezes them, then suspends them, then closes them, as each step of the policy comes due. Locked tabs (by the user or automatically) and the shown tab are left alone.
+    /// </summary>
+    /// <param name="policy">How long each step waits.</param>
+    void Cleanup(TabCleanupPolicy policy);
+
+    /// <summary>
     /// Shows a tab.
     /// </summary>
     /// <param name="tab">The tab to show.</param>
@@ -94,6 +100,31 @@ internal sealed class BrowserTabs(IBrowserTab.IFactory factory, bool singleTab =
         }
 
         Active = null;
+    }
+
+    /// <inheritdoc />
+    public void Cleanup(TabCleanupPolicy policy)
+    {
+        foreach (IBrowserTab tab in Items.Where(tab => !ReferenceEquals(tab, active) && tab.Lock == TabLock.Unlocked).ToList())
+        {
+            TimeSpan idle = tab.IdleFor;
+
+            if (idle >= policy.CloseAfter)
+            {
+                Close(tab);
+            }
+            else if (idle >= policy.SuspendAfter)
+            {
+                if (!tab.IsSuspended)
+                {
+                    tab.Suspend();
+                }
+            }
+            else if (idle >= policy.FreezeAfter && !tab.IsFrozen && !tab.IsSuspended)
+            {
+                tab.Freeze();
+            }
+        }
     }
 
     /// <inheritdoc />

@@ -17,8 +17,9 @@ networking, JavaScript). The two meet in `BrowserTab`, which wraps one CEF brows
 address and title into properties the UI binds to; CEF raises those on its own threads, so each is
 posted to the UI thread first.
 
-`BrowserTabs` holds the open tabs and which one is active. Every tab's page stays alive in the
-window, with only the active one visible, so background tabs keep running.
+`BrowserTabs` holds the open tabs and which one is active. Only the active tab is visible; a background
+tab keeps running at first, then is frozen, suspended and finally closed as it sits unused, unless it is
+locked (by the user, or automatically while its page has typed text, a transfer or sound). Showing a tab wakes it.
 
 ## Flow
 

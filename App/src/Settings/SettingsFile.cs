@@ -3,7 +3,7 @@ namespace Markwardt.Browser.Settings;
 /// <summary>
 /// Where the remembered choices are kept between runs.
 /// </summary>
-internal interface ISettingsStorage
+internal interface ISettingsFile
 {
     /// <summary>
     /// Reads the saved choices.
@@ -25,7 +25,7 @@ internal interface ISettingsStorage
 /// Keeps the remembered choices in a JSON file.
 /// </summary>
 /// <param name="path">The path of the file.</param>
-internal sealed class SettingsFile(string path) : ISettingsStorage
+internal sealed class SettingsFile(string path) : ISettingsFile
 {
     /// <inheritdoc />
     public async Task<SettingsData> Load(CancellationToken cancellation = default)
